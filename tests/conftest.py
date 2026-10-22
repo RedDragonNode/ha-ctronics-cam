@@ -109,9 +109,7 @@ def mock_onvif() -> Generator[MagicMock]:
     """Ersetzt den ONVIF-Client, die Kamera nimmt jedes Abo an."""
     with patch("custom_components.ctronics_cam.events.OnvifEventClient", autospec=True) as client_class:
         client = client_class.return_value
-        client.subscribe = AsyncMock(return_value="/onvif/Subscription?Idx=1")
-        client.renew = AsyncMock()
-        client.unsubscribe = AsyncMock()
+        client.subscribe = AsyncMock()
         yield client
 
 
@@ -123,5 +121,5 @@ async def setup_integration(
     hass.config.internal_url = "http://192.168.1.2:8123"
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     return mock_config_entry

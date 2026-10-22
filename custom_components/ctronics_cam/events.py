@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -22,8 +22,10 @@ from .api import CtronicsApi, CtronicsError
 from .const import (
     DOMAIN,
     EVENT_MOTION_TIMEOUT,
-    EVENT_RENEW_INTERVAL,
+    EVENT_RESUBSCRIBE_INTERVAL,
+    EVENT_RETRY_DELAYS,
     EVENT_SUBSCRIPTION_SECONDS,
+    EVENT_TICK_INTERVAL,
     EVENT_TYPE,
     LOGGER,
 )
@@ -44,11 +46,14 @@ class CtronicsEvents:
             async_get_clientsession(hass), f"{host}:{onvif_port}", api.username, api.password
         )
         self._webhook_id: str = entry.data[CONF_WEBHOOK_ID]
-        self._subscription_path: str | None = None
         self._unsub_timer: CALLBACK_TYPE | None = None
         self._listeners: list[Callable[[], None]] = []
         self._warned = False
         self._last_motion: datetime | None = None
+        self._failures = 0
+        self._next_subscribe_at: datetime | None = None
+        self._expires_at: datetime | None = None
+        self._subscribing = False
 
         self.motion: bool | None = None
         self.subscribed = False
@@ -70,7 +75,10 @@ class CtronicsEvents:
             update_callback()
 
     async def async_start(self) -> None:
-        """Registriert den Webhook und abonniert die Kamera."""
+        """Registriert den Webhook und abonniert die Kamera im Hintergrund.
+
+        Das erste Abo läuft als Hintergrundaufgabe, damit eine träge Kamera die Einrichtung nicht aufhält.
+        """
         webhook.async_register(
             self._hass,
             DOMAIN,
@@ -80,21 +88,17 @@ class CtronicsEvents:
             local_only=True,
             allowed_methods=["POST"],
         )
-        await self._async_subscribe()
-        self._unsub_timer = async_track_time_interval(self._hass, self._async_tick, EVENT_RENEW_INTERVAL)
+        self._entry.async_create_background_task(
+            self._hass, self._async_subscribe(), f"{DOMAIN} {self._entry.title} Ereignis-Abo"
+        )
+        self._unsub_timer = async_track_time_interval(self._hass, self._async_tick, EVENT_TICK_INTERVAL)
 
     async def async_stop(self) -> None:
-        """Beendet Abo und Webhook."""
+        """Beendet Webhook und Zeitgeber. Das Abo an der Kamera läuft von selbst ab (siehe const.py)."""
         if self._unsub_timer:
             self._unsub_timer()
             self._unsub_timer = None
         webhook.async_unregister(self._hass, self._webhook_id)
-        if self._subscription_path:
-            try:
-                await self._client.unsubscribe(self._subscription_path)
-            except CtronicsError as err:
-                LOGGER.debug("Abo konnte nicht beendet werden: %s", err)
-            self._subscription_path = None
         self.subscribed = False
 
     def _consumer_url(self) -> str | None:
@@ -111,6 +115,16 @@ class CtronicsEvents:
             LOGGER.debug(message, *args)
 
     async def _async_subscribe(self) -> None:
+        """Legt ein neues Abo an. Bei Fehlern wächst die Pause bis zum nächsten Versuch."""
+        if self._subscribing:
+            return
+        self._subscribing = True
+        try:
+            await self._async_do_subscribe()
+        finally:
+            self._subscribing = False
+
+    async def _async_do_subscribe(self) -> None:
         url = self._consumer_url()
         if url is None:
             self._warn_once(
@@ -127,26 +141,32 @@ class CtronicsEvents:
                 self._entry.title,
             )
         try:
-            self._subscription_path = await self._client.subscribe(url, EVENT_SUBSCRIPTION_SECONDS)
+            await self._client.subscribe(url, EVENT_SUBSCRIPTION_SECONDS)
         except CtronicsError as err:
-            self._subscription_path = None
-            self._warn_once("ONVIF-Abo der Kamera %s fehlgeschlagen: %s", self._entry.title, err)
-            self._set_subscribed(False)
+            delay = EVENT_RETRY_DELAYS[min(self._failures, len(EVENT_RETRY_DELAYS) - 1)]
+            self._failures += 1
+            self._next_subscribe_at = dt_util.utcnow() + timedelta(seconds=delay)
+            self._warn_once(
+                "ONVIF-Abo der Kamera %s fehlgeschlagen, neuer Versuch in %s s: %s", self._entry.title, delay, err
+            )
+            # Das letzte erfolgreiche Abo gilt noch bis zu seinem Ablauf.
+            self._set_subscribed(self._expires_at is not None and dt_util.utcnow() < self._expires_at)
             return
+        now = dt_util.utcnow()
         self._warned = False
+        self._failures = 0
+        self._next_subscribe_at = now + EVENT_RESUBSCRIBE_INTERVAL
+        self._expires_at = now + timedelta(seconds=EVENT_SUBSCRIPTION_SECONDS)
         self._set_subscribed(True)
 
     async def _async_tick(self, _now: datetime) -> None:
-        """Erneuert das Abo und setzt eine hängende Bewegungsmeldung zurück."""
-        if self._subscription_path:
-            try:
-                await self._client.renew(self._subscription_path, EVENT_SUBSCRIPTION_SECONDS)
-            except CtronicsError as err:
-                LOGGER.debug("Abo-Erneuerung fehlgeschlagen, abonniere neu: %s", err)
-                self._subscription_path = None
-        if not self._subscription_path:
+        """Abonniert rechtzeitig neu und setzt eine hängende Bewegungsmeldung zurück."""
+        now = dt_util.utcnow()
+        if self._next_subscribe_at is None or now >= self._next_subscribe_at:
             await self._async_subscribe()
-        if self.motion and self._last_motion and dt_util.utcnow() - self._last_motion > EVENT_MOTION_TIMEOUT:
+        if self.subscribed and self._expires_at is not None and now >= self._expires_at:
+            self._set_subscribed(False)
+        if self.motion and self._last_motion and now - self._last_motion > EVENT_MOTION_TIMEOUT:
             self._set_motion(False)
 
     @callback
@@ -172,7 +192,8 @@ class CtronicsEvents:
             return web.Response(status=HTTPStatus.BAD_REQUEST)
         for event in events:
             self._process(event)
-        return web.Response(status=HTTPStatus.OK)
+        # Die Kamera ist ein einfacher Client: Verbindung schließen, damit sie nicht auf uns wartet.
+        return web.Response(status=HTTPStatus.OK, headers={"Connection": "close"})
 
     @callback
     def _process(self, event: OnvifEvent) -> None:

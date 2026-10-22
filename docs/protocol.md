@@ -83,7 +83,26 @@ Einzelne Felder dürfen allein gesendet werden, die übrigen bleiben unveränder
   Ein eigenes Personen-Thema gibt es nicht. Wie sich die KI-Erkennung (`smd_*`) in `Motion` niederschlägt, ist noch zu prüfen.
 - Die Anmeldung per WS-UsernameToken akzeptiert die PC-Zeit als `Created`, auch wenn `GetSystemDateAndTime` selbst Anmeldung verlangt.
 - **Kein PullPoint:** `CreatePullPointSubscription` wird an jedem Pfad mit "Action Not Implemented" abgelehnt, obwohl `GetServiceCapabilities` `WSPullPointSupport=true` meldet.
-- **Push geht:** `wsnt:Subscribe` mit `ConsumerReference` an `/onvif/event_service` wird angenommen und liefert `http://<ip>:8080/onvif/Subscription?Idx=<n>`. Die Kamera schickt die Ereignisse dann per HTTP-POST an die Empfängeradresse (in Home Assistant ein Webhook). `Renew` und `Unsubscribe` an die Abo-Adresse funktionieren (mit `wsa:Action` `.../SubscriptionManager/RenewRequest` und `.../UnsubscribeRequest`). Bei einem Fehler abonniert die Integration neu.
+- **Push geht:** `wsnt:Subscribe` mit `ConsumerReference` an `/onvif/event_service` (mit `wsa:Action` `.../NotificationProducer/SubscribeRequest`) wird angenommen und liefert `http://<ip>:8080/onvif/Subscription?Idx=<n>`. Die Kamera schickt die Ereignisse dann per HTTP-POST (gSOAP/2.8, `Connection: close`) an die Empfängeradresse, in Home Assistant ein Webhook.
+- **Falle: `Renew` und `Unsubscribe`.** Wenn der Empfänger Home Assistant ist, blockieren beide den ONVIF-Dienst der Kamera für rund 8 Minuten (jede Anfrage läuft in einen Zeitfehler, auch `GetDeviceInformation`). CGI, RTSP und PTZ laufen weiter. Mit einem Empfänger auf einem anderen Rechner gingen beide durch, die Ursache ist also nicht geklärt. Die Integration benutzt sie deshalb nie: Sie legt alle 5 Minuten ein neues Abo mit 10 Minuten Laufzeit an, das alte läuft von selbst ab (die Kamera erlaubt höchstens 10 gleichzeitige Abos).
+- **Benachrichtigung bei Bewegung** (Beispiel, Zeit ohne `Z`):
+
+  ```xml
+  <wsnt:Notify><wsnt:NotificationMessage>
+    <wsnt:SubscriptionReference><wsa5:Address>http://…/onvif/Subscription?Idx=0</wsa5:Address></wsnt:SubscriptionReference>
+    <wsnt:Topic Dialect="…ConcreteSet">tns1:RuleEngine/CellMotionDetector/Motion</wsnt:Topic>
+    <wsnt:Message><tt:Message UtcTime="2026-10-22T22:49:02" PropertyOperation="Changed">
+      <tt:Source>
+        <tt:SimpleItem Name="VideoSourceConfigurationToken" Value="VideoIPCameraToken"/>
+        <tt:SimpleItem Name="VideoAnalyticsConfigurationToken" Value="VideoAnalyticsToken"/>
+        <tt:SimpleItem Name="Rule" Value="MyMotionDetectorRule"/>
+      </tt:Source>
+      <tt:Data><tt:SimpleItem Name="IsMotion" Value="true"/></tt:Data>
+    </tt:Message></wsnt:Message>
+  </wsnt:NotificationMessage></wsnt:Notify>
+  ```
+
+  Beim Schwenken der Kamera kamen `IsMotion=true` und eine Sekunde später `IsMotion=false`. Das Diagnose-Werkzeug `tools/listen_events.py` zeigt solche Nachrichten roh an.
 
 ## Flotte
 

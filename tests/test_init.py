@@ -33,7 +33,7 @@ async def test_setup_and_unload(hass: HomeAssistant, setup_integration: MockConf
     assert await hass.config_entries.async_unload(setup_integration.entry_id)
     await hass.async_block_till_done()
     assert setup_integration.state is ConfigEntryState.NOT_LOADED
-    mock_onvif.unsubscribe.assert_awaited_once_with("/onvif/Subscription?Idx=1")
+    mock_onvif.subscribe.assert_awaited_once()
 
 
 async def test_substream_is_disabled_by_default(hass: HomeAssistant, setup_integration: MockConfigEntry) -> None:
@@ -53,7 +53,7 @@ async def test_setup_without_onvif_has_no_motion_sensor(
     camera_vars["ov_enable"] = "0"
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     assert hass.states.get("binary_sensor.flur_motion") is None
     mock_onvif.subscribe.assert_not_awaited()
@@ -65,7 +65,7 @@ async def test_auth_failure_starts_reauth(
     mock_api.get_params.side_effect = CtronicsAuthError("nein")
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
     flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
@@ -78,7 +78,7 @@ async def test_connection_failure_retries(
     mock_api.get_params.side_effect = CtronicsConnectionError("down")
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
 
@@ -95,7 +95,7 @@ async def test_sd_sensors_only_with_card(
     hass.config.internal_url = "http://192.168.1.2:8123"
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     assert hass.states.get("sensor.flur_sd_card_status").state == "ready"
     assert round(float(hass.states.get("sensor.flur_sd_card_free_space").state), 1) == 119.0

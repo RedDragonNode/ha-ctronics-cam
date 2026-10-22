@@ -26,7 +26,7 @@ async def test_switch_state_follows_camera(
     hass.config.internal_url = "http://192.168.1.2:8123"
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     assert hass.states.get("switch.flur_ai_detection").state == STATE_ON
     assert hass.states.get("switch.flur_auto_tracking").state == STATE_ON
@@ -197,7 +197,7 @@ async def test_preset_select_from_options(
     mock_config_entry.add_to_hass(hass)
     hass.config_entries.async_update_entry(mock_config_entry, options={CONF_PRESETS: "10: Bett\n1: Schaukel\n2: Bett"})
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     state = hass.states.get("select.flur_preset_position")
     assert state.state == "unknown"

@@ -37,10 +37,15 @@ UPDATE_INTERVAL = timedelta(seconds=30)
 RTSP_MAIN_PATH = "11"
 RTSP_SUB_PATH = "12"
 
-# ONVIF-Ereignisse: Laufzeit des Abos an der Kamera und Abstand der Erneuerung
-EVENT_SUBSCRIPTION_SECONDS = 120
-EVENT_RENEW_INTERVAL = timedelta(seconds=EVENT_SUBSCRIPTION_SECONDS // 2)
+# ONVIF-Ereignisse: Die Kamera wird nie erneuert oder abgemeldet (beides legt ihren ONVIF-Dienst
+# für Minuten lahm, wenn der Empfänger Home Assistant ist). Stattdessen kommt alle paar Minuten ein
+# neues Abo, das alte läuft von selbst ab.
+EVENT_SUBSCRIPTION_SECONDS = 600
+EVENT_RESUBSCRIBE_INTERVAL = timedelta(minutes=5)
+EVENT_TICK_INTERVAL = timedelta(minutes=1)
 EVENT_MOTION_TIMEOUT = timedelta(minutes=5)
+# Pausen in Sekunden zwischen Abo-Versuchen nach Fehlern, der letzte Wert bleibt
+EVENT_RETRY_DELAYS = (60, 120, 300, 600)
 
 EVENT_TYPE = f"{DOMAIN}_event"
 SIGNAL_PTZ_MOVED = f"{DOMAIN}_ptz_moved_{{}}"

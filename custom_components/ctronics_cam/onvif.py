@@ -11,7 +11,6 @@ import asyncio
 import base64
 import hashlib
 import os
-import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from xml.etree import ElementTree as ET
@@ -24,10 +23,6 @@ REQUEST_TIMEOUT = 10
 MAX_BODY_BYTES = 256 * 1024
 
 ACTION_SUBSCRIBE = "http://docs.oasis-open.org/wsn/bw-2/NotificationProducer/SubscribeRequest"
-ACTION_RENEW = "http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/RenewRequest"
-ACTION_UNSUBSCRIBE = "http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/UnsubscribeRequest"
-
-_URL_PATH_RE = re.compile(r"^https?://[^/]+(?P<path>/.*)$")
 
 
 @dataclass(slots=True)
@@ -162,7 +157,8 @@ class OnvifEventClient:
                 async with self._session.post(
                     f"http://{self._netloc}{path}",
                     data=envelope.encode(),
-                    headers={"Content-Type": "application/soap+xml; charset=utf-8"},
+                    # Die Kamera bedient ONVIF mit einem einfachen Server, deshalb keine offenen Verbindungen halten.
+                    headers={"Content-Type": "application/soap+xml; charset=utf-8", "Connection": "close"},
                 ) as response:
                     payload = await response.read()
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -181,34 +177,20 @@ class OnvifEventClient:
                 raise CtronicsError(reason or "ONVIF-Fehler")
         return root
 
-    @staticmethod
-    def _path(address: str) -> str:
-        match = _URL_PATH_RE.match(address)
-        if not match:
-            raise CtronicsError("Ungültige Abo-Adresse")
-        return match.group("path")
+    async def subscribe(self, consumer_url: str, seconds: int) -> None:
+        """Legt ein Push-Abo an, das nach `seconds` Sekunden von selbst abläuft.
 
-    async def subscribe(self, consumer_url: str, seconds: int) -> str:
-        """Legt ein Push-Abo an und liefert den Pfad zum Verwalten (Erneuern, Beenden)."""
+        Erneuern (`Renew`) und Abmelden (`Unsubscribe`) benutzt die Integration bewusst nicht: Mit
+        Home Assistant als Empfänger blockieren beide den ONVIF-Dienst der Kamera für Minuten.
+        """
         body = (
             '<wsnt:Subscribe xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2" xmlns:wsa="http://www.w3.org/2005/08/addressing">'
             f"<wsnt:ConsumerReference><wsa:Address>{_xml_escape(consumer_url)}</wsa:Address></wsnt:ConsumerReference>"
             f"<wsnt:InitialTerminationTime>PT{seconds}S</wsnt:InitialTerminationTime></wsnt:Subscribe>"
         )
         root = await self._post("/onvif/event_service", body, ACTION_SUBSCRIBE)
-        for element in root.iter():
-            if _local(element.tag) == "Address" and element.text and "Subscription" in element.text:
-                return self._path(element.text.strip())
-        raise CtronicsError("Die Kamera hat keine Abo-Adresse geliefert")
-
-    async def renew(self, path: str, seconds: int) -> None:
-        body = (
-            '<wsnt:Renew xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2">'
-            f"<wsnt:TerminationTime>PT{seconds}S</wsnt:TerminationTime></wsnt:Renew>"
-        )
-        await self._post(path, body, ACTION_RENEW)
-
-    async def unsubscribe(self, path: str) -> None:
-        await self._post(
-            path, '<wsnt:Unsubscribe xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2"/>', ACTION_UNSUBSCRIBE
-        )
+        if not any(
+            _local(element.tag) == "Address" and element.text and "Subscription" in element.text
+            for element in root.iter()
+        ):
+            raise CtronicsError("Die Kamera hat keine Abo-Adresse geliefert")
