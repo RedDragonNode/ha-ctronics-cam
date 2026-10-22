@@ -95,9 +95,12 @@ def save(name: str, text: str) -> None:
     (OUT / name).write_text(text, encoding="utf-8")
 
 
-def probe_cgi(cam: Cam) -> None:
+def probe_cgi(cam: Cam, extra: list[str] | None = None) -> None:
     report: list[str] = []
-    for command in GET_COMMANDS:
+    for command in extra or GET_COMMANDS:
+        if not command.startswith("get"):
+            print(f"{command}: übersprungen, nur get*-Befehle sind erlaubt")
+            continue
         status, body = cam.get(f"/cgi-bin/hi3510/param.cgi?cmd={command}")
         text = mask(body.decode("utf-8", "replace").strip())
         if status == 200 and text:
@@ -106,8 +109,9 @@ def probe_cgi(cam: Cam) -> None:
         else:
             block = f"== {command}: HTTP {status}, {'leer' if not text else text[:80]}"
         report.append(block)
-    save("cgi.txt", "\n".join(report))
-    print(f"\nRohdaten: {OUT / 'cgi.txt'}")
+    name = "cgi_extra.txt" if extra else "cgi.txt"
+    save(name, "\n".join(report))
+    print(f"\nRohdaten: {OUT / name}")
 
 
 def probe_web(cam: Cam) -> None:
@@ -211,6 +215,9 @@ def probe_onvif(cam: Cam) -> None:
         t = {tag: utc.findtext(f".//{tag}") for tag in ("Year", "Month", "Day", "Hour", "Minute", "Second")}
         stamp = "{Year}-{Month:0>2}-{Day:0>2}T{Hour:0>2}:{Minute:0>2}:{Second:0>2}Z".format(**t)
         print("Kamerazeit (UTC):", stamp, "| PC:", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    if stamp is None:
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        print("Kamerazeit nicht abrufbar (Kamera verlangt schon dafür Anmeldung), verwende PC-Zeit:", stamp)
     device_path = "/onvif/device_service"
 
     info = strip_ns(soap(cam, cam.onvif_port, device_path, "<tds:GetDeviceInformation/>", stamp))
@@ -273,12 +280,16 @@ def probe_onvif(cam: Cam) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("what", choices=["cgi", "web", "onvif", "rtsp", "all"])
+    parser.add_argument("--cmds", help="nur diese get*-Befehle abfragen (kommagetrennt), nur für `cgi`")
     args = parser.parse_args()
     cam = Cam(load_env())
     steps = {"cgi": probe_cgi, "web": probe_web, "onvif": probe_onvif, "rtsp": probe_rtsp}
     for name in steps if args.what == "all" else [args.what]:
         print(f"\n######## {name} ########")
-        steps[name](cam)
+        if name == "cgi" and args.cmds:
+            probe_cgi(cam, [c.strip() for c in args.cmds.split(",") if c.strip()])
+        else:
+            steps[name](cam)
 
 
 if __name__ == "__main__":
