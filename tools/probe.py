@@ -7,6 +7,7 @@ Passwort-ähnliche Werte werden in der Ausgabe maskiert. Rohdaten landen in `too
     python tools/probe.py cgi      # Hi3510-CGI: bekannte get*-Befehle
     python tools/probe.py web      # Web-Oberfläche der Kamera nach Befehlsnamen durchsuchen
     python tools/probe.py onvif    # ONVIF: Geräteinfo, Profile, PTZ-Presets, Event-Themen
+    python tools/probe.py events --seconds 30   # ONVIF-Ereignisse live mitlesen
     python tools/probe.py rtsp     # RTSP-DESCRIBE für /11 und /12
     python tools/probe.py all
 """
@@ -30,14 +31,47 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "tools" / "out"
 
 GET_COMMANDS = [
-    "getserverinfo", "getnetattr", "getwirelessattr", "getvideoattr", "getimageattr",
-    "getircutattr", "getaudioattr", "getmdattr", "getmdalarm", "getrtspattr", "getosdattr",
-    "getptzattr", "getalarmattr", "getalarmstatus", "gettimeattr", "getlanguage",
-    "getsdcardinfo", "getrecattr", "getrecordattr", "getrecordscheduleattr", "getpushattr",
-    "gettrackattr", "getaiattr", "getdetectattr", "getpersonattr", "gethumanattr",
-    "getsmartattr", "getmotorattr", "getptzspeed", "getprivacyattr", "getcoverattr",
-    "getsirenattr", "getlightattr", "getonvifattr", "getcloudattr", "getp2pattr",
-    "getsetupflag", "getuserattr", "getrtmpattr", "getftpattr", "getemailattr",
+    "getserverinfo",
+    "getnetattr",
+    "getwirelessattr",
+    "getvideoattr",
+    "getimageattr",
+    "getircutattr",
+    "getaudioattr",
+    "getmdattr",
+    "getmdalarm",
+    "getrtspattr",
+    "getosdattr",
+    "getptzattr",
+    "getalarmattr",
+    "getalarmstatus",
+    "gettimeattr",
+    "getlanguage",
+    "getsdcardinfo",
+    "getrecattr",
+    "getrecordattr",
+    "getrecordscheduleattr",
+    "getpushattr",
+    "gettrackattr",
+    "getaiattr",
+    "getdetectattr",
+    "getpersonattr",
+    "gethumanattr",
+    "getsmartattr",
+    "getmotorattr",
+    "getptzspeed",
+    "getprivacyattr",
+    "getcoverattr",
+    "getsirenattr",
+    "getlightattr",
+    "getonvifattr",
+    "getcloudattr",
+    "getp2pattr",
+    "getsetupflag",
+    "getuserattr",
+    "getrtmpattr",
+    "getftpattr",
+    "getemailattr",
 ]
 SECRET_KEY = re.compile(r"pwd|pass|psk|secret|token|auth|key", re.I)
 
@@ -52,6 +86,7 @@ def load_env() -> dict[str, str]:
         if line and not line.startswith("#") and "=" in line:
             key, value = line.split("=", 1)
             env[key.strip()] = value.strip()
+    env.update({key: value for key, value in os.environ.items() if key.startswith("CTRONICS_")})
     for required in ("CTRONICS_HOST", "CTRONICS_USER", "CTRONICS_PASS"):
         if not env.get(required):
             sys.exit(f"`{required}` fehlt in `.env.local`.")
@@ -157,7 +192,11 @@ def probe_rtsp(cam: Cam) -> None:
         except OSError as err:
             print(f"RTSP {path}: {err}")
             continue
-        wanted = [ln for ln in data.splitlines() if ln.startswith(("RTSP/", "m=", "a=rtpmap", "a=framerate", "a=fmtp", "WWW-Auth"))]
+        wanted = [
+            ln
+            for ln in data.splitlines()
+            if ln.startswith(("RTSP/", "m=", "a=rtpmap", "a=framerate", "a=fmtp", "WWW-Auth"))
+        ]
         print(f"== RTSP {path}", *("  " + ln for ln in wanted), sep="\n")
 
 
@@ -168,7 +207,7 @@ NS = {
 }
 
 
-def soap(cam: Cam, port: int, path: str, body: str, camera_time: str | None) -> ET.Element:
+def soap(cam: Cam, port: int, path: str, body: str, camera_time: str | None, action: str | None = None) -> ET.Element:
     header = ""
     if camera_time:
         nonce = os.urandom(16)
@@ -183,6 +222,13 @@ def soap(cam: Cam, port: int, path: str, body: str, camera_time: str | None) -> 
             f'<Created xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">{camera_time}</Created>'
             "</UsernameToken></Security></s:Header>"
         )
+    if action:
+        addressing = f'<wsa:Action xmlns:wsa="http://www.w3.org/2005/08/addressing">{action}</wsa:Action>'
+        header = (
+            header.replace("<s:Header>", f"<s:Header>{addressing}", 1)
+            if header
+            else f"<s:Header>{addressing}</s:Header>"
+        )
     envelope = (
         '<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" '
         'xmlns:tds="http://www.onvif.org/ver10/device/wsdl" xmlns:trt="http://www.onvif.org/ver10/media/wsdl" '
@@ -191,7 +237,9 @@ def soap(cam: Cam, port: int, path: str, body: str, camera_time: str | None) -> 
         f"{header}<s:Body>{body}</s:Body></s:Envelope>"
     )
     request = urllib.request.Request(
-        f"http://{cam.host}:{port}{path}", data=envelope.encode(), headers={"Content-Type": "application/soap+xml; charset=utf-8"}
+        f"http://{cam.host}:{port}{path}",
+        data=envelope.encode(),
+        headers={"Content-Type": "application/soap+xml; charset=utf-8"},
     )
     try:
         with urllib.request.urlopen(request, timeout=8) as response:
@@ -228,7 +276,15 @@ def probe_onvif(cam: Cam) -> None:
     if fault:
         print("  Fehler:", fault)
 
-    caps = strip_ns(soap(cam, cam.onvif_port, device_path, "<tds:GetCapabilities><tds:Category>All</tds:Category></tds:GetCapabilities>", stamp))
+    caps = strip_ns(
+        soap(
+            cam,
+            cam.onvif_port,
+            device_path,
+            "<tds:GetCapabilities><tds:Category>All</tds:Category></tds:GetCapabilities>",
+            stamp,
+        )
+    )
     xaddrs = {el.tag: el.text for el in caps.iter("XAddr")}
     for parent in caps.iter():
         for child in list(parent):
@@ -254,7 +310,15 @@ def probe_onvif(cam: Cam) -> None:
             token = token or prof.get("token")
     ptz = path_of("PTZ")
     if ptz and token:
-        presets = strip_ns(soap(cam, cam.onvif_port, ptz, f"<tptz:GetPresets><tptz:ProfileToken>{token}</tptz:ProfileToken></tptz:GetPresets>", stamp))
+        presets = strip_ns(
+            soap(
+                cam,
+                cam.onvif_port,
+                ptz,
+                f"<tptz:GetPresets><tptz:ProfileToken>{token}</tptz:ProfileToken></tptz:GetPresets>",
+                stamp,
+            )
+        )
         names = [(p.get("token"), p.findtext("Name")) for p in presets.iter("Preset")]
         print("\n== PTZ-Presets:", names or "keine")
     events = path_of("Events")
@@ -277,13 +341,79 @@ def probe_onvif(cam: Cam) -> None:
         print("\n== Event-Themen", *(f"  {t}" for t in topics or ["keine gefunden"]), sep="\n")
 
 
+def now_stamp() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def probe_events(cam: Cam, seconds: int = 20) -> None:
+    """Abonniert ONVIF-Ereignisse (PullPoint) und gibt sie `seconds` Sekunden lang aus."""
+    caps = strip_ns(
+        soap(
+            cam,
+            cam.onvif_port,
+            "/onvif/device_service",
+            "<tds:GetCapabilities><tds:Category>Events</tds:Category></tds:GetCapabilities>",
+            now_stamp(),
+        )
+    )
+    events = caps.findtext(".//Events/XAddr")
+    if not events:
+        print("Kein Events-Dienst gefunden.")
+        return
+    events_path = re.sub(r"^https?://[^/]+", "", events)
+    created = strip_ns(
+        soap(
+            cam,
+            cam.onvif_port,
+            events_path,
+            "<tev:CreatePullPointSubscription><tev:InitialTerminationTime>PT120S</tev:InitialTerminationTime></tev:CreatePullPointSubscription>",
+            now_stamp(),
+        )
+    )
+    address = created.findtext(".//SubscriptionReference/Address")
+    if not address:
+        print("Abo nicht möglich:", created.findtext(".//Text"))
+        return
+    sub_path = re.sub(r"^https?://[^/]+", "", address)
+    sub_port = (
+        int(re.match(r"^https?://[^/:]+:(\d+)", address).group(1))
+        if re.match(r"^https?://[^/:]+:(\d+)", address)
+        else cam.onvif_port
+    )
+    print(f"Abo erstellt ({sub_path}), höre {seconds} s zu. Jetzt vor der Kamera bewegen ...")
+    end = time.time() + seconds
+    while time.time() < end:
+        pulled = strip_ns(
+            soap(
+                cam,
+                sub_port,
+                sub_path,
+                "<tev:PullMessages><tev:Timeout>PT4S</tev:Timeout><tev:MessageLimit>20</tev:MessageLimit></tev:PullMessages>",
+                now_stamp(),
+            )
+        )
+        for message in pulled.iter("NotificationMessage"):
+            topic = message.findtext("Topic")
+            inner = message.find(".//Message/Message")
+            utc = inner.get("UtcTime") if inner is not None else "?"
+            op = inner.get("PropertyOperation") if inner is not None else "?"
+            items = [f"{i.get('Name')}={i.get('Value')}" for i in message.iter("SimpleItem")]
+            print(f"{utc} {op:9} {topic}  {' '.join(items)}")
+    soap(cam, sub_port, sub_path, '<wsnt:Unsubscribe xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2"/>', now_stamp())
+    print("Abo beendet.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("what", choices=["cgi", "web", "onvif", "rtsp", "all"])
+    parser.add_argument("what", choices=["cgi", "web", "onvif", "events", "rtsp", "all"])
     parser.add_argument("--cmds", help="nur diese get*-Befehle abfragen (kommagetrennt), nur für `cgi`")
+    parser.add_argument("--seconds", type=int, default=20, help="Dauer des Event-Abos, nur für `events`")
     args = parser.parse_args()
     cam = Cam(load_env())
     steps = {"cgi": probe_cgi, "web": probe_web, "onvif": probe_onvif, "rtsp": probe_rtsp}
+    if args.what == "events":
+        probe_events(cam, args.seconds)
+        return
     for name in steps if args.what == "all" else [args.what]:
         print(f"\n######## {name} ########")
         if name == "cgi" and args.cmds:

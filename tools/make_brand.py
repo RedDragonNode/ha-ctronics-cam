@@ -41,7 +41,7 @@ def diagonal_gradient(size: int, top: tuple[int, int, int], bottom: tuple[int, i
     for y in range(small):
         for x in range(small):
             t = (x + y) / (2 * (small - 1))
-            px[x, y] = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom))
+            px[x, y] = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom, strict=True))
     return img.resize((size, size), Image.BICUBIC)
 
 
@@ -128,7 +128,7 @@ def draw_banner(icon: Image.Image, font_path: str) -> Image.Image:
     banner.alpha_composite(icon_small, (pad, pad))
     d = ImageDraw.Draw(banner)
     y = (height - block_h) // 2
-    for (text, color), box, h in zip(lines, boxes, line_h):
+    for (text, color), box, h in zip(lines, boxes, line_h, strict=True):
         d.text((text_x - box[0], y - box[1]), text, font=font, fill=color)
         y += h + gap
     return banner
@@ -153,7 +153,11 @@ def main() -> None:
         w = round(banner.width * h / banner.height)
         banner.resize((w, h), Image.LANCZOS).save(BRAND_DIR / name, optimize=True)
 
-    print("Fertig:", *sorted(p.relative_to(ROOT).as_posix() for p in (*BRAND_DIR.glob("*.png"), *DOCS_DIR.glob("*.png"))), sep="\n  ")
+    print(
+        "Fertig:",
+        *sorted(p.relative_to(ROOT).as_posix() for p in (*BRAND_DIR.glob("*.png"), *DOCS_DIR.glob("*.png"))),
+        sep="\n  ",
+    )
 
 
 if __name__ == "__main__":

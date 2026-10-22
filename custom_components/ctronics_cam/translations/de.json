@@ -1,0 +1,171 @@
+{
+  "config": {
+    "flow_title": "Ctronics 4K Cam ({host})",
+    "step": {
+      "user": {
+        "title": "Ctronics-Kamera hinzufügen",
+        "description": "Gib Adresse und Zugangsdaten der Kamera ein. Es sind dieselben wie in der Ctronics-Pro-App und in der Weboberfläche der Kamera.",
+        "data": {
+          "name": "Name",
+          "host": "IP-Adresse",
+          "port": "HTTP-Port",
+          "username": "Benutzername",
+          "password": "Passwort"
+        },
+        "data_description": {
+          "name": "Wird in Home Assistant als Gerätename angezeigt.",
+          "host": "Feste IP-Adresse der Kamera, am besten im Router reserviert.",
+          "port": "Port der Weboberfläche der Kamera, normalerweise 80."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneut anmelden",
+        "description": "Die Zugangsdaten für {name} wurden abgelehnt. Gib Benutzername und Passwort neu ein.",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      },
+      "reconfigure": {
+        "title": "Verbindung der Kamera ändern",
+        "description": "Ändere Adresse oder Zugangsdaten dieser Kamera.",
+        "data": {
+          "host": "IP-Adresse",
+          "port": "HTTP-Port",
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Die Kamera ist nicht erreichbar. Prüfe IP-Adresse und Port.",
+      "invalid_auth": "Benutzername oder Passwort wurden abgelehnt.",
+      "unknown_device": "Das Gerät meldet keine MAC-Adresse und sieht nicht nach einer unterstützten Kamera aus.",
+      "wrong_device": "Das ist eine andere Kamera als die eingerichtete."
+    },
+    "abort": {
+      "already_configured": "Diese Kamera ist schon eingerichtet. Ihre Adresse wurde aktualisiert.",
+      "reauth_successful": "Zugangsdaten aktualisiert.",
+      "reconfigure_successful": "Verbindung aktualisiert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Optionen der Ctronics 4K Cam",
+        "data": {
+          "ptz_step_ms": "Schrittdauer der Richtungstasten",
+          "presets": "Preset-Positionen"
+        },
+        "data_description": {
+          "ptz_step_ms": "Wie lange sich die Kamera bewegt, wenn eine Richtungstaste gedrückt wird.",
+          "presets": "Eine Position pro Zeile als Nummer und Name, zum Beispiel \"1: Schaukel\". Nummern von 1 bis 64. Die Positionen selbst liegen in der Kamera. Sobald du welche einträgst, gibt es ein Auswahlfeld dafür."
+        }
+      }
+    },
+    "error": {
+      "invalid_presets": "Pro Zeile eine Position im Format \"Nummer: Name\" mit einer Nummer von 1 bis 64."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "motion": { "name": "Bewegung" }
+    },
+    "button": {
+      "ptz_up": { "name": "Nach oben" },
+      "ptz_down": { "name": "Nach unten" },
+      "ptz_left": { "name": "Nach links" },
+      "ptz_right": { "name": "Nach rechts" },
+      "ptz_center": { "name": "Zur Mitte fahren" },
+      "ptz_stop": { "name": "Stopp" },
+      "patrol_horizontal": { "name": "Rundgang waagerecht" },
+      "patrol_vertical": { "name": "Rundgang senkrecht" }
+    },
+    "camera": {
+      "sub_stream": { "name": "Substream" }
+    },
+    "number": {
+      "detection_threshold": { "name": "Erkennungsschwelle" },
+      "ptz_speed": { "name": "PTZ-Geschwindigkeit" }
+    },
+    "select": {
+      "detection_type": {
+        "name": "Erkennungsart",
+        "state": {
+          "human": "Mensch",
+          "human_vehicle": "Mensch und Fahrzeug",
+          "human_pet": "Mensch und Haustier",
+          "human_vehicle_pet": "Mensch, Fahrzeug und Haustier"
+        }
+      },
+      "infrared": {
+        "name": "Nachtsicht-LEDs",
+        "state": {
+          "auto": "Automatisch",
+          "on": "Immer an",
+          "off": "Aus"
+        }
+      },
+      "preset": { "name": "Preset-Position" }
+    },
+    "sensor": {
+      "sd_status": { "name": "SD-Karte Status" },
+      "sd_free": { "name": "SD-Karte freier Platz" },
+      "sd_total": { "name": "SD-Karte Kapazität" }
+    },
+    "switch": {
+      "auto_tracking": { "name": "Auto-Tracking" },
+      "ai_detection": { "name": "KI-Erkennung" },
+      "detection_frame": { "name": "Erkennungsrahmen im Bild" },
+      "image_flip": { "name": "Bild kopfüber" },
+      "image_mirror": { "name": "Bild spiegeln" }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "Die Kamera hat den Befehl abgelehnt: {error}"
+    }
+  },
+  "selector": {
+    "ptz_direction": {
+      "options": {
+        "up": "Nach oben",
+        "down": "Nach unten",
+        "left": "Nach links",
+        "right": "Nach rechts"
+      }
+    }
+  },
+  "services": {
+    "ptz_move": {
+      "name": "Kamera bewegen",
+      "description": "Bewegt die Kamera kurz in eine Richtung und hält sie wieder an.",
+      "fields": {
+        "direction": { "name": "Richtung", "description": "Richtung der Bewegung." },
+        "speed": { "name": "Geschwindigkeit", "description": "Geschwindigkeit von 1 bis 8. Standard ist die Einstellung PTZ-Geschwindigkeit." },
+        "duration": { "name": "Dauer", "description": "Wie lange sich die Kamera bewegt, in Sekunden. Standard ist die Schrittdauer aus den Optionen." }
+      }
+    },
+    "ptz_goto_preset": {
+      "name": "Preset anfahren",
+      "description": "Fährt die Kamera an eine gespeicherte Position.",
+      "fields": {
+        "preset": { "name": "Preset", "description": "Nummer der gespeicherten Position, 1 bis 64." }
+      }
+    },
+    "ptz_save_preset": {
+      "name": "Preset speichern",
+      "description": "Speichert die aktuelle Position der Kamera. Eine vorhandene Position mit derselben Nummer wird überschrieben.",
+      "fields": {
+        "preset": { "name": "Preset", "description": "Nummer, unter der die Position gespeichert wird, 1 bis 64." }
+      }
+    },
+    "ptz_delete_preset": {
+      "name": "Preset löschen",
+      "description": "Löscht eine gespeicherte Position aus der Kamera.",
+      "fields": {
+        "preset": { "name": "Preset", "description": "Nummer der Position, die gelöscht wird, 1 bis 64." }
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "motion": { "default": "mdi:motion-sensor-off", "state": { "on": "mdi:motion-sensor" } }
+    },
+    "button": {
+      "ptz_up": { "default": "mdi:arrow-up-bold" },
+      "ptz_down": { "default": "mdi:arrow-down-bold" },
+      "ptz_left": { "default": "mdi:arrow-left-bold" },
+      "ptz_right": { "default": "mdi:arrow-right-bold" },
+      "ptz_center": { "default": "mdi:crosshairs" },
+      "ptz_stop": { "default": "mdi:stop" },
+      "patrol_horizontal": { "default": "mdi:swap-horizontal" },
+      "patrol_vertical": { "default": "mdi:swap-vertical" }
+    },
+    "camera": {
+      "sub_stream": { "default": "mdi:video-low-quality" }
+    },
+    "number": {
+      "detection_threshold": { "default": "mdi:tune-variant" },
+      "ptz_speed": { "default": "mdi:speedometer" }
+    },
+    "select": {
+      "detection_type": { "default": "mdi:account-search" },
+      "infrared": { "default": "mdi:led-on" },
+      "preset": { "default": "mdi:map-marker-radius" }
+    },
+    "sensor": {
+      "sd_status": { "default": "mdi:sd" },
+      "sd_free": { "default": "mdi:sd" },
+      "sd_total": { "default": "mdi:sd" }
+    },
+    "switch": {
+      "auto_tracking": { "default": "mdi:target-account", "state": { "off": "mdi:target-variant" } },
+      "ai_detection": { "default": "mdi:account-eye", "state": { "off": "mdi:account-eye-outline" } },
+      "detection_frame": { "default": "mdi:selection" },
+      "image_flip": { "default": "mdi:flip-vertical" },
+      "image_mirror": { "default": "mdi:flip-horizontal" }
+    }
+  },
+  "services": {
+    "ptz_move": { "service": "mdi:arrow-all" },
+    "ptz_goto_preset": { "service": "mdi:map-marker-radius" },
+    "ptz_save_preset": { "service": "mdi:content-save" },
+    "ptz_delete_preset": { "service": "mdi:delete" }
+  }
+}

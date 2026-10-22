@@ -1,4 +1,4 @@
-# Kamera-Schnittstelle (Ctronics 4K, Hipcam-Firmware)
+﻿# Kamera-Schnittstelle (Ctronics 4K, Hipcam-Firmware)
 
 Ermittelt an einer Kamera mit Modellcode `C6F0SpZ0N0PpL2`, Firmware `V30.1.60.11.88-20260204`, Web-Version `V3.0.7.6`.
 Alle Angaben stammen aus lesenden Abfragen und aus dem Code der Web-Oberfläche der Kamera (`/web/js/*.js`).
@@ -42,32 +42,49 @@ Setzen: `GET /cgi-bin/hi3510/param.cgi?cmd=<setbefehl>&-name=wert`. Die Web-Ober
 
 Nicht vorhanden (404): `getptzattr`, `getaiattr`, `gettrackattr`, `getsirenattr`, `getprivacyattr`, `getalarmstatus` und weitere. Es gibt also keine Abfrage des aktuellen Alarmzustands, Bewegung und Person kommen nur über ONVIF-Events.
 
-## Schreiben (abgeleitet)
+## Schreiben
 
-| Zweck | Aufruf |
-|---|---|
-| KI-Erkennung ein/aus | `cmd=setsmdattr&-smd_enable=0\|1` |
-| Erkennungsart, Schwelle, Rahmen | `cmd=setsmdex&-smd_type=0..3&-smd_gthresh=1..100&-smd_rect=0\|1` |
-| Alarmart | `cmd=setmdalarm&-aname=type&-switch=on\|off` |
-| Auto-Tracking | vermutlich `cmd=setsmartrackattr&-smartrack_enable=0\|1` (nicht aus der Web-Oberfläche belegt, zu testen) |
-| Bild spiegeln/drehen | `cmd=setimageattr&-image_type=...` (siehe `web/display.html`) |
+Antwort bei Erfolg: `[Succeed]set ok.`, bei falschen Parametern `[Error]Param error.` (jeweils HTTP 200).
+Einzelne Felder dürfen allein gesendet werden, die übrigen bleiben unverändert.
 
-## PTZ (abgeleitet aus `web/js/js.js`)
+| Zweck | Aufruf | Stand |
+|---|---|---|
+| KI-Erkennung ein/aus | `cmd=setsmdattr&-smd_enable=0\|1` | getestet |
+| Erkennungsschwelle | `cmd=setsmdex&-smd_gthresh=1..100` | getestet |
+| Erkennungsart, Rahmen | `cmd=setsmdex&-smd_type=0..3` und `&-smd_rect=0\|1` | abgeleitet |
+| Auto-Tracking | `cmd=setsmartrackattr&-smartrack_enable=0\|1` | getestet |
+| Nachtsicht-LEDs | `cmd=setinfrared&-infraredstat=auto\|open\|close` | abgeleitet |
+| Bild spiegeln/drehen | `cmd=setimageattr&-flip=on\|off` und `&-mirror=on\|off` | abgeleitet |
+| Alarmart | `cmd=setmdalarm&-aname=type&-switch=on\|off` | abgeleitet |
 
-| Zweck | Aufruf |
-|---|---|
-| Bewegen | `GET /cgi-bin/hi3510/ptzctrl.cgi?-step=0&-act=<aktion>&-speed=<n>` |
-| Aktionen | `up`, `down`, `left`, `right`, `home`, `stop`, `zoomin`, `zoomout`, `focusin`, `focusout`, `hscan`, `vscan` |
-| Preset anfahren | `GET /cgi-bin/hi3510/preset.cgi?-act=goto&-number=<n>` (nullbasiert) |
-| Preset speichern | `GET /cgi-bin/hi3510/preset.cgi?-act=set&-status=1&-number=<n>` |
-| Preset löschen | `GET /cgi-bin/hi3510/param.cgi?cmd=preset&-act=set&-status=0&-number=<n>` |
+## PTZ
 
-Die Kamera speichert keine Preset-Namen. Namen muss die Integration selbst halten.
+| Zweck | Aufruf | Stand |
+|---|---|---|
+| Bewegen | `GET /cgi-bin/hi3510/ptzctrl.cgi?-step=0&-act=<aktion>&-speed=<1..8>` | getestet |
+| Einzelschritt | wie oben mit `-step=1` | getestet |
+| Aktionen | `up`, `down`, `left`, `right`, `home`, `stop`, `hscan`, `vscan` (`zoomin`, `zoomout`, `focusin`, `focusout` stehen in der Web-Oberfläche, die Kamera hat keinen Zoom) | `up/down/left/right/home/stop` getestet |
+| Preset anfahren | `GET /cgi-bin/hi3510/preset.cgi?-act=goto&-number=<n>` (nullbasiert) | abgeleitet |
+| Preset speichern | `GET /cgi-bin/hi3510/preset.cgi?-act=set&-status=1&-number=<n>` | abgeleitet |
+| Preset löschen | `GET /cgi-bin/hi3510/param.cgi?cmd=preset&-act=set&-status=0&-number=<n>` | abgeleitet |
+
+`ptzctrl.cgi` mit `-step=0` bewegt dauerhaft, bis `stop` kommt. Die Kamera speichert keine Preset-Namen, die Integration hält sie selbst.
+
+## Schnappschuss und Speicher
+
+- JPEG in voller Auflösung (rund 350 KB): `GET /tmpfs/auto.jpg`. Dieselbe Adresse nennt ONVIF `GetSnapshotUri`.
+- `sdfreespace` und `sdtotalspace` in `getserverinfo` zählen in KiB, `sdstatus` ist `out` ohne Karte und `Ready` mit Karte.
 
 ## ONVIF (gelesen)
 
 - Profile: `MainStreamProfileToken` (H.264, 3840x2160) und `SecondStreamProfileToken` (H.264, 1280x720).
 - PTZ: `GetPresets` liefert pauschal `Preset001` bis `Preset256`, das sagt nichts darüber, welche Slots belegt sind.
 - Event-Themen: `RuleEngine/CellMotionDetector/Motion`, `VideoSource/MotionAlarm`, `VideoSource/SignalLoss`, `VideoSource/SignalStandardMismatch`.
-  Ein eigenes Personen-Thema gibt es nicht. Wie sich die KI-Erkennung (`smd_*`) in `Motion` niederschlägt, muss mit einer Event-Subscription geprüft werden.
+  Ein eigenes Personen-Thema gibt es nicht. Wie sich die KI-Erkennung (`smd_*`) in `Motion` niederschlägt, ist noch zu prüfen.
 - Die Anmeldung per WS-UsernameToken akzeptiert die PC-Zeit als `Created`, auch wenn `GetSystemDateAndTime` selbst Anmeldung verlangt.
+- **Kein PullPoint:** `CreatePullPointSubscription` wird an jedem Pfad mit "Action Not Implemented" abgelehnt, obwohl `GetServiceCapabilities` `WSPullPointSupport=true` meldet.
+- **Push geht:** `wsnt:Subscribe` mit `ConsumerReference` an `/onvif/event_service` wird angenommen und liefert `http://<ip>:8080/onvif/Subscription?Idx=<n>`. Die Kamera schickt die Ereignisse dann per HTTP-POST an die Empfängeradresse (in Home Assistant ein Webhook). `Renew` und `Unsubscribe` an die Abo-Adresse funktionieren (mit `wsa:Action` `.../SubscriptionManager/RenewRequest` und `.../UnsubscribeRequest`). Bei einem Fehler abonniert die Integration neu.
+
+## Flotte
+
+Alle vier geprüften Kameras melden Modell `C6F0SpZ0N0PpL2` und dieselbe Firmware, die Zugangsdaten sind identisch. Eine Kamera hat eine SD-Karte.

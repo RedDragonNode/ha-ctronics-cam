@@ -1,0 +1,171 @@
+{
+  "config": {
+    "flow_title": "Ctronics 4K Cam ({host})",
+    "step": {
+      "user": {
+        "title": "Add Ctronics camera",
+        "description": "Enter the address and login of the camera. The same login is used in the Ctronics Pro app and in the camera's web interface.",
+        "data": {
+          "name": "Name",
+          "host": "IP address",
+          "port": "HTTP port",
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "name": "Shown as the device name in Home Assistant.",
+          "host": "Fixed IP address of the camera, ideally reserved in your router.",
+          "port": "Port of the camera's web interface, normally 80."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Log in again",
+        "description": "The login for {name} was rejected. Enter the current username and password.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Change camera connection",
+        "description": "Change the address or login of this camera.",
+        "data": {
+          "host": "IP address",
+          "port": "HTTP port",
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The camera could not be reached. Check the IP address and port.",
+      "invalid_auth": "Username or password was rejected.",
+      "unknown_device": "The device did not report a MAC address and does not look like a supported camera.",
+      "wrong_device": "This is a different camera than the one that was set up."
+    },
+    "abort": {
+      "already_configured": "This camera is already set up. Its address was updated.",
+      "reauth_successful": "Login updated.",
+      "reconfigure_successful": "Connection updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ctronics 4K Cam options",
+        "data": {
+          "ptz_step_ms": "Step duration of the direction buttons",
+          "presets": "Preset positions"
+        },
+        "data_description": {
+          "ptz_step_ms": "How long the camera moves when a direction button is pressed.",
+          "presets": "One position per line as number and name, for example \"1: Swing\". Numbers go from 1 to 64. The positions themselves are stored in the camera. If you list any, a preset selector appears."
+        }
+      }
+    },
+    "error": {
+      "invalid_presets": "Use one line per position in the form \"number: name\" with a number from 1 to 64."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "motion": { "name": "Motion" }
+    },
+    "button": {
+      "ptz_up": { "name": "Move up" },
+      "ptz_down": { "name": "Move down" },
+      "ptz_left": { "name": "Move left" },
+      "ptz_right": { "name": "Move right" },
+      "ptz_center": { "name": "Move to center" },
+      "ptz_stop": { "name": "Stop" },
+      "patrol_horizontal": { "name": "Horizontal patrol" },
+      "patrol_vertical": { "name": "Vertical patrol" }
+    },
+    "camera": {
+      "sub_stream": { "name": "Sub stream" }
+    },
+    "number": {
+      "detection_threshold": { "name": "Detection threshold" },
+      "ptz_speed": { "name": "PTZ speed" }
+    },
+    "select": {
+      "detection_type": {
+        "name": "Detection type",
+        "state": {
+          "human": "Human",
+          "human_vehicle": "Human and vehicle",
+          "human_pet": "Human and pet",
+          "human_vehicle_pet": "Human, vehicle and pet"
+        }
+      },
+      "infrared": {
+        "name": "Night vision LEDs",
+        "state": {
+          "auto": "Automatic",
+          "on": "Always on",
+          "off": "Off"
+        }
+      },
+      "preset": { "name": "Preset position" }
+    },
+    "sensor": {
+      "sd_status": { "name": "SD card status" },
+      "sd_free": { "name": "SD card free space" },
+      "sd_total": { "name": "SD card capacity" }
+    },
+    "switch": {
+      "auto_tracking": { "name": "Auto tracking" },
+      "ai_detection": { "name": "AI detection" },
+      "detection_frame": { "name": "Detection frame in video" },
+      "image_flip": { "name": "Flip image" },
+      "image_mirror": { "name": "Mirror image" }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "The camera rejected the command: {error}"
+    }
+  },
+  "selector": {
+    "ptz_direction": {
+      "options": {
+        "up": "Up",
+        "down": "Down",
+        "left": "Left",
+        "right": "Right"
+      }
+    }
+  },
+  "services": {
+    "ptz_move": {
+      "name": "Move camera",
+      "description": "Moves the camera briefly in one direction and stops it again.",
+      "fields": {
+        "direction": { "name": "Direction", "description": "Direction of the movement." },
+        "speed": { "name": "Speed", "description": "Speed from 1 to 8. Default is the PTZ speed setting." },
+        "duration": { "name": "Duration", "description": "How long to move, in seconds. Default is the step duration from the options." }
+      }
+    },
+    "ptz_goto_preset": {
+      "name": "Go to preset",
+      "description": "Moves the camera to a stored position.",
+      "fields": {
+        "preset": { "name": "Preset", "description": "Number of the stored position, 1 to 64." }
+      }
+    },
+    "ptz_save_preset": {
+      "name": "Save preset",
+      "description": "Stores the current position of the camera. An existing position with the same number is overwritten.",
+      "fields": {
+        "preset": { "name": "Preset", "description": "Number to store the position under, 1 to 64." }
+      }
+    },
+    "ptz_delete_preset": {
+      "name": "Delete preset",
+      "description": "Deletes a stored position from the camera.",
+      "fields": {
+        "preset": { "name": "Preset", "description": "Number of the position to delete, 1 to 64." }
+      }
+    }
+  }
+}
