@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from collections.abc import Generator
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_WEBHOOK_ID
 from homeassistant.core import HomeAssistant
@@ -16,6 +18,14 @@ from custom_components.ctronics_cam.const import CONF_PRESETS, CONF_PTZ_STEP_MS,
 
 from .conftest import HOST, MAC
 
+
+@pytest.fixture
+def mock_setup_entry() -> Generator[AsyncMock]:
+    """Verhindert, dass ein im Flow angelegter Eintrag wirklich eingerichtet wird."""
+    with patch("custom_components.ctronics_cam.async_setup_entry", return_value=True) as mock:
+        yield mock
+
+
 USER_INPUT = {
     CONF_NAME: "Flur",
     CONF_HOST: HOST,
@@ -25,6 +35,7 @@ USER_INPUT = {
 }
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_creates_entry(hass: HomeAssistant, mock_api: MagicMock) -> None:
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     assert result["type"] is FlowResultType.FORM
@@ -41,6 +52,7 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, mock_api: MagicMock)
     assert result["result"].unique_id == MAC
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_cannot_connect_then_recovers(hass: HomeAssistant, mock_api: MagicMock) -> None:
     mock_api.get_params.side_effect = CtronicsConnectionError("down")
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
@@ -69,6 +81,7 @@ async def test_user_flow_unknown_device(hass: HomeAssistant, mock_api: MagicMock
     assert result["errors"] == {"base": "unknown_device"}
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_already_configured_updates_host(
     hass: HomeAssistant, mock_api: MagicMock, mock_config_entry: MockConfigEntry
 ) -> None:
@@ -82,6 +95,7 @@ async def test_user_flow_already_configured_updates_host(
     assert mock_config_entry.data[CONF_HOST] == "192.168.1.77"
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_dhcp_discovery_prefills_host(hass: HomeAssistant, mock_api: MagicMock) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
@@ -98,6 +112,7 @@ async def test_dhcp_discovery_prefills_host(hass: HomeAssistant, mock_api: Magic
     assert result["result"].unique_id == MAC
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_dhcp_known_camera_updates_host(
     hass: HomeAssistant, mock_api: MagicMock, mock_config_entry: MockConfigEntry
 ) -> None:
@@ -112,6 +127,7 @@ async def test_dhcp_known_camera_updates_host(
     assert mock_config_entry.data[CONF_HOST] == "192.168.1.99"
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_reauth_updates_password(
     hass: HomeAssistant, mock_api: MagicMock, mock_config_entry: MockConfigEntry
 ) -> None:
@@ -140,6 +156,7 @@ async def test_reauth_wrong_device(
     assert result["errors"] == {"base": "wrong_device"}
 
 
+@pytest.mark.usefixtures("mock_setup_entry")
 async def test_reconfigure_changes_address(
     hass: HomeAssistant, mock_api: MagicMock, mock_config_entry: MockConfigEntry
 ) -> None:
