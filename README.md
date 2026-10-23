@@ -30,7 +30,7 @@ Die Einrichtung läuft über die Oberfläche, mit Erkennung neuer Kameras im Net
 
 Die Kamera meldet Bewegung per ONVIF. Home Assistant gibt dafür einen Webhook an und die Kamera schickt ihre Meldungen per HTTP dorthin. Dafür muss die Kamera Home Assistant erreichen können, und Home Assistant braucht eine **kurze interne URL mit HTTP** (Einstellungen → System → Netzwerk), am besten die IP-Adresse wie `http://192.168.178.53:8123`. Die Kamera verträgt nur kurze Adressen: Die interne URL darf höchstens 35 Zeichen lang sein, sonst bleiben die Bewegungsmeldungen aus und im Log steht eine Warnung.
 
-Ist die KI-Erkennung an, meldet die Kamera nur noch erkannte Objekte der gewählten Art (Mensch, Fahrzeug, Haustier) als Bewegung. Alle ONVIF-Meldungen erscheinen außerdem als Ereignis `ctronics_cam_event` mit Thema und Daten, falls du eigene Auslöser bauen möchtest.
+Der Sensor `Bewegung` zeigt die **normale Bewegungserkennung** der Kamera. Die KI-Erkennung ändert daran nichts: Die Kamera meldet auch bei eingeschalteter KI keine Personen getrennt von anderer Bewegung, in Tests kam bei Schwenken und bei einem Menschen vor der Kamera immer dieselbe Meldung. Die KI-Erkennung wirkt in der Kamera selbst (Rahmen im Bild, Auto-Tracking, Aufnahmen auf der SD-Karte). Alle ONVIF-Meldungen erscheinen außerdem als Ereignis `ctronics_cam_event` mit Thema und Daten, falls du eigene Auslöser bauen möchtest.
 
 ### Preset-Positionen
 
@@ -62,9 +62,9 @@ Du brauchst IP-Adresse, Benutzername und Passwort der Kamera, dieselben wie in d
 
 # Ctronics 4K Cam for Home Assistant (English)
 
-Local integration for **Ctronics 4K pan/tilt cameras** running Hipcam firmware (Hi3510 CGI, RTSP, ONVIF), for example the indoor camera with auto tracking and AI person detection. Everything runs on your LAN, no cloud and no account needed. Protocol notes: [docs/protocol.md](docs/protocol.md).
+Local integration for **Ctronics 4K pan/tilt cameras** running Hipcam firmware (Hi3510 CGI, RTSP, ONVIF), for example the indoor camera with auto tracking and AI detection. Everything runs on your LAN, no cloud and no account needed. Protocol notes: [docs/protocol.md](docs/protocol.md).
 
-**Features:** RTSP live stream and snapshot, PTZ buttons, a selector for named presets, switches for AI detection and auto tracking, detection type and threshold, night vision LEDs, flip and mirror, a motion `binary_sensor` via ONVIF events, SD card diagnostics, four PTZ services, DHCP discovery, reauth, reconfigure and diagnostics.
+**Features:** RTSP live stream and snapshot, PTZ buttons, a selector for named presets, switches for AI detection and auto tracking, detection type and threshold, night vision LEDs, flip and mirror, a motion `binary_sensor` via ONVIF events (general motion, the camera does not report persons separately), SD card diagnostics, four PTZ services, DHCP discovery, reauth, reconfigure and diagnostics.
 
 **Motion events** are pushed by the camera to a Home Assistant webhook, so Home Assistant needs an internal URL using plain HTTP that the camera can reach.
 

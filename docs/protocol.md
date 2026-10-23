@@ -83,7 +83,7 @@ Beim Wechsel der Nachtsicht-LEDs auf `open` oder `auto` setzt die Kamera zusätz
 - Profile: `MainStreamProfileToken` (H.264, 3840x2160) und `SecondStreamProfileToken` (H.264, 1280x720).
 - PTZ: `GetPresets` liefert pauschal `Preset001` bis `Preset256`, das sagt nichts darüber, welche Slots belegt sind.
 - Event-Themen: `RuleEngine/CellMotionDetector/Motion`, `VideoSource/MotionAlarm`, `VideoSource/SignalLoss`, `VideoSource/SignalStandardMismatch`.
-  Ein eigenes Personen-Thema gibt es nicht. Wie sich die KI-Erkennung (`smd_*`) in `Motion` niederschlägt, ist noch zu prüfen.
+  Ein eigenes Personen-Thema gibt es nicht. Geprüft mit eingeschalteter KI-Erkennung (`smd_enable=1`, Erkennungsart Mensch): Beim Schwenken der Kamera und bei einem Menschen vor der Kamera kam immer nur `RuleEngine/CellMotionDetector/Motion` mit `IsMotion` (true, eine Sekunde später false, bei Dauerbewegung etwa alle 10 Sekunden). Andere Themen sind in keinem Test aufgetaucht. Die KI-Erkennung ändert die ONVIF-Meldungen also nicht.
 - Die Anmeldung per WS-UsernameToken akzeptiert die PC-Zeit als `Created`, auch wenn `GetSystemDateAndTime` selbst Anmeldung verlangt.
 - **Kein PullPoint:** `CreatePullPointSubscription` wird an jedem Pfad mit "Action Not Implemented" abgelehnt, obwohl `GetServiceCapabilities` `WSPullPointSupport=true` meldet.
 - **Push geht:** `wsnt:Subscribe` mit `ConsumerReference` an `/onvif/event_service` (mit `wsa:Action` `.../NotificationProducer/SubscribeRequest`) wird angenommen und liefert `http://<ip>:8080/onvif/Subscription?Idx=<n>`. Die Kamera schickt die Ereignisse dann per HTTP-POST (gSOAP/2.8, `Connection: close`) an die Empfängeradresse, in Home Assistant ein Webhook.

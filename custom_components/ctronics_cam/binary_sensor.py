@@ -22,7 +22,7 @@ async def async_setup_entry(
 
 
 class CtronicsMotionSensor(CtronicsEntity, BinarySensorEntity):
-    """Bewegung oder erkannte Person, je nach Einstellung der KI-Erkennung an der Kamera."""
+    """Normale Bewegungserkennung der Kamera. Personen meldet sie über ONVIF nicht getrennt."""
 
     _attr_translation_key = "motion"
     _attr_device_class = BinarySensorDeviceClass.MOTION
