@@ -51,10 +51,13 @@ Einzelne Felder dürfen allein gesendet werden, die übrigen bleiben unveränder
 |---|---|---|
 | KI-Erkennung ein/aus | `cmd=setsmdattr&-smd_enable=0\|1` | getestet |
 | Erkennungsschwelle | `cmd=setsmdex&-smd_gthresh=1..100` | getestet |
-| Erkennungsart, Rahmen | `cmd=setsmdex&-smd_type=0..3` und `&-smd_rect=0\|1` | abgeleitet |
+| Erkennungsart | `cmd=setsmdex&-smd_type=0..3` | getestet (in Home Assistant) |
+| Erkennungsrahmen | `cmd=setsmdex&-smd_rect=0\|1` | abgeleitet |
 | Auto-Tracking | `cmd=setsmartrackattr&-smartrack_enable=0\|1` | getestet |
-| Nachtsicht-LEDs | `cmd=setinfrared&-infraredstat=auto\|open\|close` | abgeleitet |
-| Bild spiegeln/drehen | `cmd=setimageattr&-flip=on\|off` und `&-mirror=on\|off` | abgeleitet |
+| Nachtsicht-LEDs | `cmd=setinfrared&-infraredstat=auto\|open\|close` | getestet (in Home Assistant) |
+| Bild drehen und spiegeln | `cmd=setimageattr&-flip=on\|off` und `&-mirror=on\|off` | getestet (in Home Assistant) |
+
+Beim Wechsel der Nachtsicht-LEDs auf `open` oder `auto` setzt die Kamera zusätzlich `night=on` in `getimageattr`, bei `close` wieder `night=off`.
 | Alarmart | `cmd=setmdalarm&-aname=type&-switch=on\|off` | abgeleitet |
 
 ## PTZ
