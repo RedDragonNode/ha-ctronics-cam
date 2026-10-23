@@ -21,7 +21,7 @@ if sys.platform == "win32":
 
 MAC = "00:0f:97:aa:bb:cc"
 HOST = "192.168.1.50"
-WEBHOOK_ID = "test_webhook_id"
+WEBHOOK_ID = "testwebhook1"
 
 CAMERA_VARS = {
     "model": "C6F0SpZ0N0PpL2",

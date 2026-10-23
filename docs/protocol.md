@@ -1,4 +1,4 @@
-﻿# Kamera-Schnittstelle (Ctronics 4K, Hipcam-Firmware)
+# Kamera-Schnittstelle (Ctronics 4K, Hipcam-Firmware)
 
 Ermittelt an einer Kamera mit Modellcode `C6F0SpZ0N0PpL2`, Firmware `V30.1.60.11.88-20260204`, Web-Version `V3.0.7.6`.
 Alle Angaben stammen aus lesenden Abfragen und aus dem Code der Web-Oberfläche der Kamera (`/web/js/*.js`).
@@ -84,7 +84,8 @@ Einzelne Felder dürfen allein gesendet werden, die übrigen bleiben unveränder
 - Die Anmeldung per WS-UsernameToken akzeptiert die PC-Zeit als `Created`, auch wenn `GetSystemDateAndTime` selbst Anmeldung verlangt.
 - **Kein PullPoint:** `CreatePullPointSubscription` wird an jedem Pfad mit "Action Not Implemented" abgelehnt, obwohl `GetServiceCapabilities` `WSPullPointSupport=true` meldet.
 - **Push geht:** `wsnt:Subscribe` mit `ConsumerReference` an `/onvif/event_service` (mit `wsa:Action` `.../NotificationProducer/SubscribeRequest`) wird angenommen und liefert `http://<ip>:8080/onvif/Subscription?Idx=<n>`. Die Kamera schickt die Ereignisse dann per HTTP-POST (gSOAP/2.8, `Connection: close`) an die Empfängeradresse, in Home Assistant ein Webhook.
-- **Falle: `Renew` und `Unsubscribe`.** Wenn der Empfänger Home Assistant ist, blockieren beide den ONVIF-Dienst der Kamera für rund 8 Minuten (jede Anfrage läuft in einen Zeitfehler, auch `GetDeviceInformation`). CGI, RTSP und PTZ laufen weiter. Mit einem Empfänger auf einem anderen Rechner gingen beide durch, die Ursache ist also nicht geklärt. Die Integration benutzt sie deshalb nie: Sie legt alle 5 Minuten ein neues Abo mit 10 Minuten Laufzeit an, das alte läuft von selbst ab (die Kamera erlaubt höchstens 10 gleichzeitige Abos).
+- **Falle: Länge der Empfängeradresse.** Der ONVIF-Dienst der Kamera verträgt nur kurze Adressen. Gemessen mit Home Assistant als Empfänger: Bei 55 Zeichen (`http://192.168.178.53:8123/api/webhook/` plus 16 Zeichen) laufen Abo und Ereignisse einwandfrei. Bei 103 Zeichen (der übliche 64-stellige Webhook-Name) bricht der Dienst beim ersten Ereignis weg: Jede ONVIF-Anfrage, auch `GetDeviceInformation`, läuft dann rund 8 Minuten in einen Fehler oder Zeitfehler, danach ist er wieder da. CGI, RTSP und PTZ laufen währenddessen weiter. Die Integration nutzt deshalb einen 12-stelligen Webhook-Namen und abonniert nur, wenn die Adresse höchstens 60 Zeichen hat.
+- **Falle: `Renew` und `Unsubscribe`.** Mit einer 68 Zeichen langen Adresse legten beide den Dienst für Minuten lahm, mit 43 Zeichen gingen sie durch. Die Integration benutzt sie ohnehin nie: Sie legt alle 5 Minuten ein neues Abo mit 10 Minuten Laufzeit an, das alte läuft von selbst ab (die Kamera erlaubt höchstens 10 gleichzeitige Abos).
 - **Benachrichtigung bei Bewegung** (Beispiel, Zeit ohne `Z`):
 
   ```xml

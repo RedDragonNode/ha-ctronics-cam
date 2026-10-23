@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import secrets
 from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_WEBHOOK_ID
 from homeassistant.core import callback
@@ -24,6 +24,7 @@ from .const import (
     DEFAULT_PTZ_STEP_MS,
     DEFAULT_USERNAME,
     DOMAIN,
+    EVENT_WEBHOOK_ID_LENGTH,
 )
 from .coordinator import CtronicsConfigEntry
 from .presets import parse_presets
@@ -87,7 +88,7 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_PORT: int(user_input[CONF_PORT]),
                     CONF_USERNAME: user_input[CONF_USERNAME],
                     CONF_PASSWORD: user_input[CONF_PASSWORD],
-                    CONF_WEBHOOK_ID: webhook.async_generate_id(),
+                    CONF_WEBHOOK_ID: secrets.token_hex(EVENT_WEBHOOK_ID_LENGTH // 2),
                 }
                 return self.async_create_entry(title=user_input[CONF_NAME], data=data)
 

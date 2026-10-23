@@ -47,6 +47,12 @@ EVENT_MOTION_TIMEOUT = timedelta(minutes=5)
 # Pausen in Sekunden zwischen Abo-Versuchen nach Fehlern, der letzte Wert bleibt
 EVENT_RETRY_DELAYS = (60, 120, 300, 600)
 
+# Die Kamera stürzt in ihrem ONVIF-Dienst ab (rund 8 Minuten ohne Antwort), wenn die Empfängeradresse zu lang ist.
+# Gemessen: 55 Zeichen laufen, 103 Zeichen nicht. Deshalb ist der Webhook-Name kurz (er ist nur lokal erreichbar)
+# und die Adresse darf höchstens 60 Zeichen lang sein, sonst wird nicht abonniert.
+EVENT_WEBHOOK_ID_LENGTH = 12
+EVENT_MAX_URL_LENGTH = 60
+
 EVENT_TYPE = f"{DOMAIN}_event"
 SIGNAL_PTZ_MOVED = f"{DOMAIN}_ptz_moved_{{}}"
 

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE
+from homeassistant.const import CONF_WEBHOOK_ID, STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.network import NoURLAvailableError
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events, async_fire_time_changed
@@ -262,5 +262,35 @@ async def test_no_internal_url_leaves_events_off(
     with patch("custom_components.ctronics_cam.events.webhook.async_generate_url", side_effect=NoURLAvailableError):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
+    mock_onvif.subscribe.assert_not_awaited()
+    assert hass.states.get("binary_sensor.flur_motion").state == STATE_UNAVAILABLE
+
+
+async def test_long_webhook_id_is_shortened(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
+) -> None:
+    """Einträge der ersten Version haben einen 64-stelligen Namen, die Adresse für die Kamera muss kurz bleiben."""
+    hass.config.internal_url = "http://192.168.1.2:8123"
+    mock_config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        mock_config_entry, data={**mock_config_entry.data, CONF_WEBHOOK_ID: "ab" * 32}
+    )
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    url = mock_onvif.subscribe.await_args.args[0]
+    assert url == f"http://192.168.1.2:8123/api/webhook/{'ab' * 6}"
+    assert len(url) < 64
+
+
+async def test_too_long_internal_url_is_not_used(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
+) -> None:
+    """Eine zu lange Adresse würde die Kamera lahmlegen, also wird gar nicht abonniert."""
+    hass.config.internal_url = "http://eine-wirklich-sehr-lange-adresse.meinhaus.example.org:8123"
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
     mock_onvif.subscribe.assert_not_awaited()
     assert hass.states.get("binary_sensor.flur_motion").state == STATE_UNAVAILABLE

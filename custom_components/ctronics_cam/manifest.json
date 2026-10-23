@@ -1,6 +1,7 @@
 {
   "domain": "ctronics_cam",
   "name": "Ctronics 4K Cam",
+  "categories": ["security_safety.cameras"],
   "codeowners": ["@RedDragonNode"],
   "config_flow": true,
   "dependencies": ["webhook"],

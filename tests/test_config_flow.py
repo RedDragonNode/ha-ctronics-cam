@@ -48,7 +48,7 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, mock_api: MagicMock)
     assert result["data"][CONF_HOST] == HOST
     assert result["data"][CONF_PORT] == 80
     assert result["data"][CONF_PASSWORD] == "geheim"
-    assert result["data"][CONF_WEBHOOK_ID]
+    assert len(result["data"][CONF_WEBHOOK_ID]) == 12
     assert result["result"].unique_id == MAC
 
 

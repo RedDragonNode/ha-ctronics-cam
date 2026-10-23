@@ -21,12 +21,14 @@ from homeassistant.util import dt as dt_util
 from .api import CtronicsApi, CtronicsError
 from .const import (
     DOMAIN,
+    EVENT_MAX_URL_LENGTH,
     EVENT_MOTION_TIMEOUT,
     EVENT_RESUBSCRIBE_INTERVAL,
     EVENT_RETRY_DELAYS,
     EVENT_SUBSCRIPTION_SECONDS,
     EVENT_TICK_INTERVAL,
     EVENT_TYPE,
+    EVENT_WEBHOOK_ID_LENGTH,
     LOGGER,
 )
 from .onvif import OnvifEvent, OnvifEventClient, motion_state, parse_notifications
@@ -45,7 +47,8 @@ class CtronicsEvents:
         self._client = OnvifEventClient(
             async_get_clientsession(hass), f"{host}:{onvif_port}", api.username, api.password
         )
-        self._webhook_id: str = entry.data[CONF_WEBHOOK_ID]
+        # Einträge der ersten Version haben einen langen Namen, der gekürzt benutzt wird.
+        self._webhook_id: str = entry.data[CONF_WEBHOOK_ID][:EVENT_WEBHOOK_ID_LENGTH]
         self._unsub_timer: CALLBACK_TYPE | None = None
         self._listeners: list[Callable[[], None]] = []
         self._warned = False
@@ -131,6 +134,20 @@ class CtronicsEvents:
                 "Keine interne Adresse von Home Assistant bekannt, Bewegungsmeldungen der Kamera %s sind aus. "
                 "Bitte unter Einstellungen > System > Netzwerk eine interne URL eintragen",
                 self._entry.title,
+            )
+            self._set_subscribed(False)
+            return
+        if len(url) > EVENT_MAX_URL_LENGTH:
+            # Eine zu lange Adresse legt den ONVIF-Dienst der Kamera für Minuten lahm, also gar nicht erst abonnieren.
+            self._next_subscribe_at = dt_util.utcnow() + timedelta(seconds=EVENT_RETRY_DELAYS[-1])
+            self._warn_once(
+                "Die Adresse %s ist mit %s Zeichen zu lang für die Kamera %s (höchstens %s), "
+                "Bewegungsmeldungen sind aus. Bitte unter Einstellungen > System > Netzwerk "
+                "eine kürzere interne URL eintragen, am besten die IP-Adresse",
+                url,
+                len(url),
+                self._entry.title,
+                EVENT_MAX_URL_LENGTH,
             )
             self._set_subscribed(False)
             return

@@ -28,7 +28,7 @@ Die Einrichtung läuft über die Oberfläche, mit Erkennung neuer Kameras im Net
 
 ### Bewegung und Personen
 
-Die Kamera meldet Bewegung per ONVIF. Home Assistant gibt dafür einen Webhook an und die Kamera schickt ihre Meldungen per HTTP dorthin. Dafür muss in Home Assistant eine **interne URL mit HTTP** eingetragen sein (Einstellungen → System → Netzwerk) und die Kamera Home Assistant erreichen können.
+Die Kamera meldet Bewegung per ONVIF. Home Assistant gibt dafür einen Webhook an und die Kamera schickt ihre Meldungen per HTTP dorthin. Dafür muss die Kamera Home Assistant erreichen können, und Home Assistant braucht eine **kurze interne URL mit HTTP** (Einstellungen → System → Netzwerk), am besten die IP-Adresse wie `http://192.168.178.53:8123`. Die Kamera verträgt nur kurze Adressen: Die interne URL darf höchstens 35 Zeichen lang sein, sonst bleiben die Bewegungsmeldungen aus und im Log steht eine Warnung.
 
 Ist die KI-Erkennung an, meldet die Kamera nur noch erkannte Objekte der gewählten Art (Mensch, Fahrzeug, Haustier) als Bewegung. Alle ONVIF-Meldungen erscheinen außerdem als Ereignis `ctronics_cam_event` mit Thema und Daten, falls du eigene Auslöser bauen möchtest.
 
