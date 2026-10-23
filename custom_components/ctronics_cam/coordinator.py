@@ -9,11 +9,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo, format_mac
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import CtronicsApi, CtronicsAuthError, CtronicsError
-from .const import DEFAULT_PTZ_SPEED, DOMAIN, LOGGER, UPDATE_INTERVAL
+from .const import DEFAULT_PTZ_SPEED, DOMAIN, LOGGER, REFRESH_COOLDOWN, UPDATE_INTERVAL
 
 if TYPE_CHECKING:
     from .events import CtronicsEvents
@@ -107,7 +108,13 @@ class CtronicsCoordinator(DataUpdateCoordinator[CameraState]):
 
     def __init__(self, hass: HomeAssistant, entry: CtronicsConfigEntry, api: CtronicsApi) -> None:
         super().__init__(
-            hass, LOGGER, config_entry=entry, name=f"{DOMAIN} {entry.title}", update_interval=UPDATE_INTERVAL
+            hass,
+            LOGGER,
+            config_entry=entry,
+            name=f"{DOMAIN} {entry.title}",
+            update_interval=UPDATE_INTERVAL,
+            # Nach einem Schaltvorgang wenig warten, damit die Anzeige schnell nachzieht (Standard wären 10 s).
+            request_refresh_debouncer=Debouncer(hass, LOGGER, cooldown=REFRESH_COOLDOWN, immediate=False),
         )
         self.api = api
 

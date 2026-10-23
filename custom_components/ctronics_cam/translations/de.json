@@ -126,6 +126,12 @@
       "message": "Die Kamera hat den Befehl abgelehnt: {error}"
     }
   },
+  "issues": {
+    "onvif_unreachable": {
+      "title": "ONVIF der Kamera {name} antwortet nicht",
+      "description": "Die Bewegungsmeldungen der Kamera {name} sind aus, weil ihr ONVIF-Dienst seit einigen Minuten nicht erreichbar ist. Stream, Schnappschüsse und Steuerung funktionieren weiter. Meist hilft es, die Kamera kurz vom Strom zu trennen. Die Integration versucht es weiter automatisch und entfernt diesen Hinweis, sobald ONVIF wieder antwortet."
+    }
+  },
   "selector": {
     "ptz_direction": {
       "options": {

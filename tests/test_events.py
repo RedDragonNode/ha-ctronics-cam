@@ -9,12 +9,15 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import CONF_WEBHOOK_ID, STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.network import NoURLAvailableError
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events, async_fire_time_changed
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.ctronics_cam.api import CtronicsError
 from custom_components.ctronics_cam.const import (
+    DOMAIN,
+    EVENT_ISSUE_AFTER_FAILURES,
     EVENT_MOTION_TIMEOUT,
     EVENT_RESUBSCRIBE_INTERVAL,
     EVENT_RETRY_DELAYS,
@@ -294,3 +297,66 @@ async def test_too_long_internal_url_is_not_used(
 
     mock_onvif.subscribe.assert_not_awaited()
     assert hass.states.get("binary_sensor.flur_motion").state == STATE_UNAVAILABLE
+
+
+async def test_repair_issue_while_onvif_stays_unreachable(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_api: MagicMock,
+    mock_onvif: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Nach drei Fehlversuchen erscheint ein Hinweis, der wieder verschwindet, sobald ONVIF antwortet."""
+    mock_onvif.subscribe.side_effect = CtronicsError("Verbindung abgelehnt")
+    hass.config.internal_url = "http://192.168.1.2:8123"
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    registry = ir.async_get(hass)
+    issue_id = f"onvif_unreachable_{mock_config_entry.entry_id}"
+
+    async def advance_until(condition) -> None:
+        for _ in range(30):
+            if condition():
+                return
+            freezer.tick(EVENT_TICK_INTERVAL)
+            async_fire_time_changed(hass)
+            await hass.async_block_till_done()
+        raise AssertionError("Bedingung wurde nicht erreicht")
+
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    await advance_until(lambda: registry.async_get_issue(DOMAIN, issue_id) is not None)
+    assert mock_onvif.subscribe.await_count == EVENT_ISSUE_AFTER_FAILURES
+    issue = registry.async_get_issue(DOMAIN, issue_id)
+    assert issue.translation_key == "onvif_unreachable"
+    assert issue.translation_placeholders == {"name": "Flur"}
+
+    mock_onvif.subscribe.side_effect = None
+    await advance_until(lambda: registry.async_get_issue(DOMAIN, issue_id) is None)
+    assert hass.states.get("binary_sensor.flur_motion").state == STATE_OFF
+
+
+async def test_repair_issue_is_removed_when_the_entry_is_unloaded(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_api: MagicMock,
+    mock_onvif: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    mock_onvif.subscribe.side_effect = CtronicsError("nein")
+    hass.config.internal_url = "http://192.168.1.2:8123"
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    for _ in range(30):
+        freezer.tick(EVENT_TICK_INTERVAL)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    registry = ir.async_get(hass)
+    issue_id = f"onvif_unreachable_{mock_config_entry.entry_id}"
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue_id) is None

@@ -126,6 +126,12 @@
       "message": "The camera rejected the command: {error}"
     }
   },
+  "issues": {
+    "onvif_unreachable": {
+      "title": "ONVIF of camera {name} does not respond",
+      "description": "Motion events of camera {name} are off because its ONVIF service has not been reachable for several minutes. Stream, snapshots and controls still work. Briefly unplugging the camera from power usually brings the service back. The integration keeps trying automatically and removes this notice once ONVIF answers again."
+    }
+  },
   "selector": {
     "ptz_direction": {
       "options": {

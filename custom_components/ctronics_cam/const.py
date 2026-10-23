@@ -33,6 +33,7 @@ MAX_PTZ_SPEED = 8
 MAX_PRESET = 64
 
 UPDATE_INTERVAL = timedelta(seconds=30)
+REFRESH_COOLDOWN = 1.0
 
 RTSP_MAIN_PATH = "11"
 RTSP_SUB_PATH = "12"
@@ -46,6 +47,8 @@ EVENT_TICK_INTERVAL = timedelta(minutes=1)
 EVENT_MOTION_TIMEOUT = timedelta(minutes=5)
 # Pausen in Sekunden zwischen Abo-Versuchen nach Fehlern, der letzte Wert bleibt
 EVENT_RETRY_DELAYS = (60, 120, 300, 600)
+# Nach so vielen Fehlversuchen in Folge erscheint in Home Assistant ein Hinweis (Reparaturen)
+EVENT_ISSUE_AFTER_FAILURES = 3
 
 # Die Kamera stürzt in ihrem ONVIF-Dienst ab (rund 8 Minuten ohne Antwort), wenn die Empfängeradresse zu lang ist.
 # Gemessen: 55 Zeichen laufen, 103 Zeichen nicht. Deshalb ist der Webhook-Name kurz (er ist nur lokal erreichbar)

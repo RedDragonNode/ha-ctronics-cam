@@ -43,6 +43,12 @@ Die Positionen selbst liegen in der Kamera (1 bis 64). Die Kamera kennt keine Na
 
 Danach erscheint das Auswahlfeld `Preset-Position`. Speichern und Löschen läuft über die Dienste `ptz_save_preset` und `ptz_delete_preset`, damit nichts aus Versehen überschrieben wird.
 
+## Fehlersuche
+
+- **Sensor „Bewegung“ ist nicht verfügbar.** Die Kamera meldet Bewegung nur, solange ihr ONVIF-Dienst läuft. Dieser Dienst kann bei den Kameras von selbst wegbrechen, Stream, Schnappschuss und Steuerung laufen dann weiter. Die Integration versucht es mit wachsenden Pausen neu und zeigt nach einigen Minuten unter **Einstellungen → System → Reparaturen** einen Hinweis. Meist hilft es, die Kamera kurz vom Strom zu trennen. Ein Ausschalten und Einschalten von ONVIF in den Kameraeinstellungen reicht nicht.
+- **Im Log steht, die Adresse sei zu lang.** Die interne URL von Home Assistant darf höchstens 35 Zeichen haben, siehe oben.
+- **Entity-IDs enden auf `_2`.** Das passiert, wenn dieselben Namen schon von einer anderen Ctronics-Integration belegt sind. Die IDs lassen sich in den Entity-Einstellungen ändern.
+
 ## Installation (HACS)
 
 1. HACS öffnen, oben rechts **Benutzerdefinierte Repositories** wählen.

@@ -13,6 +13,7 @@ from homeassistant.components import webhook
 from homeassistant.const import CONF_WEBHOOK_ID
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.network import NoURLAvailableError
@@ -21,6 +22,7 @@ from homeassistant.util import dt as dt_util
 from .api import CtronicsApi, CtronicsError
 from .const import (
     DOMAIN,
+    EVENT_ISSUE_AFTER_FAILURES,
     EVENT_MAX_URL_LENGTH,
     EVENT_MOTION_TIMEOUT,
     EVENT_RESUBSCRIBE_INTERVAL,
@@ -102,7 +104,28 @@ class CtronicsEvents:
             self._unsub_timer()
             self._unsub_timer = None
         webhook.async_unregister(self._hass, self._webhook_id)
+        self._delete_issue()
         self.subscribed = False
+
+    @property
+    def _issue_id(self) -> str:
+        return f"onvif_unreachable_{self._entry.entry_id}"
+
+    @callback
+    def _create_issue(self) -> None:
+        ir.async_create_issue(
+            self._hass,
+            DOMAIN,
+            self._issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="onvif_unreachable",
+            translation_placeholders={"name": self._entry.title},
+        )
+
+    @callback
+    def _delete_issue(self) -> None:
+        ir.async_delete_issue(self._hass, DOMAIN, self._issue_id)
 
     def _consumer_url(self) -> str | None:
         try:
@@ -166,12 +189,15 @@ class CtronicsEvents:
             self._warn_once(
                 "ONVIF-Abo der Kamera %s fehlgeschlagen, neuer Versuch in %s s: %s", self._entry.title, delay, err
             )
+            if self._failures >= EVENT_ISSUE_AFTER_FAILURES:
+                self._create_issue()
             # Das letzte erfolgreiche Abo gilt noch bis zu seinem Ablauf.
             self._set_subscribed(self._expires_at is not None and dt_util.utcnow() < self._expires_at)
             return
         now = dt_util.utcnow()
         self._warned = False
         self._failures = 0
+        self._delete_issue()
         self._next_subscribe_at = now + EVENT_RESUBSCRIBE_INTERVAL
         self._expires_at = now + timedelta(seconds=EVENT_SUBSCRIPTION_SECONDS)
         self._set_subscribed(True)
