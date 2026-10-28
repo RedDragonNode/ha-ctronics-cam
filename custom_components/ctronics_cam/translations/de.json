@@ -15,7 +15,7 @@
         },
         "data_description": {
           "name": "Wird in Home Assistant als Gerätename angezeigt.",
-          "prefix": "Optional. Wird dem Namen vorangestellt: Aus \"Spielzimmer\" und \"Fuchsrevier\" wird \"Spielzimmer Fuchsrevier\", die Entity-IDs beginnen dann mit spielzimmer_fuchsrevier. Lässt sich später in den Optionen ändern.",
+          "prefix": "Pflichtfeld. Wird dem Namen vorangestellt: Aus \"Spielzimmer\" und \"Fuchsrevier\" wird \"Spielzimmer Fuchsrevier\", die Entity-IDs beginnen dann mit spielzimmer_fuchsrevier. Lässt sich später nicht mehr ändern.",
           "host": "Feste IP-Adresse der Kamera, am besten im Router reserviert.",
           "port": "Port der Weboberfläche der Kamera, normalerweise 80."
         }
@@ -40,6 +40,7 @@
       }
     },
     "error": {
+      "prefix_required": "Der Präfix darf nicht leer sein.",
       "cannot_connect": "Die Kamera ist nicht erreichbar. Prüfe IP-Adresse und Port.",
       "invalid_auth": "Benutzername oder Passwort wurden abgelehnt.",
       "unknown_device": "Das Gerät meldet keine MAC-Adresse und sieht nicht nach einer unterstützten Kamera aus.",
@@ -56,14 +57,10 @@
       "init": {
         "title": "Optionen der Ctronics 4K Cam",
         "data": {
-          "prefix": "Präfix",
           "ptz_step_ms": "Schrittdauer der Richtungstasten",
-          "presets": "Preset-Positionen",
-          "rename_entity_ids": "Entity-IDs umbenennen"
+          "presets": "Preset-Positionen"
         },
         "data_description": {
-          "prefix": "Wird dem Namen der Kamera vorangestellt, zum Beispiel \"Spielzimmer\". Leer lassen für keinen Präfix. Ändert den Gerätenamen und damit die Anzeigenamen aller Entities.",
-          "rename_entity_ids": "Ändert einmalig auch die Entity-IDs auf den neuen Namen, aus camera.fuchsrevier wird camera.spielzimmer_fuchsrevier. Achtung: Automationen, Skripte und Dashboards, die eine alte ID nennen, werden nicht angepasst. Ohne Haken bleiben die IDs, wie sie sind.",
           "ptz_step_ms": "Wie lange sich die Kamera bewegt, wenn eine Richtungstaste gedrückt wird.",
           "presets": "Eine Position pro Zeile als Nummer und Name, zum Beispiel \"1: Schaukel\". Nummern von 1 bis 64. Die Positionen selbst liegen in der Kamera. Sobald du welche einträgst, gibt es ein Auswahlfeld dafür."
         }

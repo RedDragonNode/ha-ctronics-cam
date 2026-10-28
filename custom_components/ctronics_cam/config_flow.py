@@ -20,7 +20,6 @@ from .const import (
     CONF_PREFIX,
     CONF_PRESETS,
     CONF_PTZ_STEP_MS,
-    CONF_RENAME_ENTITY_IDS,
     DEFAULT_NAME,
     DEFAULT_PORT,
     DEFAULT_PTZ_STEP_MS,
@@ -29,7 +28,6 @@ from .const import (
     EVENT_WEBHOOK_ID_LENGTH,
 )
 from .coordinator import CtronicsConfigEntry
-from .naming import device_name, rename_entity_ids
 from .presets import parse_presets
 
 
@@ -38,7 +36,7 @@ def _credentials_schema(defaults: Mapping[str, Any] | None = None, *, with_name:
     fields: dict[Any, Any] = {}
     if with_name:
         fields[vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, DEFAULT_NAME))] = selector.TextSelector()
-        fields[vol.Optional(CONF_PREFIX, default=defaults.get(CONF_PREFIX, ""))] = selector.TextSelector()
+        fields[vol.Required(CONF_PREFIX, default=defaults.get(CONF_PREFIX, vol.UNDEFINED))] = selector.TextSelector()
     fields[vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, vol.UNDEFINED))] = selector.TextSelector()
     fields[vol.Required(CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT))] = selector.NumberSelector(
         selector.NumberSelectorConfig(min=1, max=65535, mode=selector.NumberSelectorMode.BOX)
@@ -80,8 +78,13 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        mac: str | None = None
         if user_input is not None:
-            errors, mac = await self._async_validate(user_input)
+            prefix = user_input[CONF_PREFIX].strip()
+            if not prefix:
+                errors[CONF_PREFIX] = "prefix_required"
+            else:
+                errors, mac = await self._async_validate(user_input)
             if not errors and mac:
                 await self.async_set_unique_id(mac)
                 self._abort_if_unique_id_configured(
@@ -97,7 +100,7 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=user_input[CONF_NAME],
                     data=data,
-                    options={CONF_PREFIX: user_input.get(CONF_PREFIX, "").strip()},
+                    options={CONF_PREFIX: prefix},
                 )
 
         defaults: dict[str, Any] = dict(user_input or {})
@@ -182,7 +185,10 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class CtronicsOptionsFlow(OptionsFlowWithReload):
-    """Präfix des Gerätenamens, Schrittdauer der PTZ-Tasten und Namen der Preset-Positionen."""
+    """Schrittdauer der PTZ-Tasten und Namen der Preset-Positionen.
+
+    Das Präfix wird nur beim Hinzufügen der Kamera vergeben und bleibt hier unberührt.
+    """
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -192,12 +198,9 @@ class CtronicsOptionsFlow(OptionsFlowWithReload):
             except ValueError:
                 errors[CONF_PRESETS] = "invalid_presets"
             else:
-                prefix = user_input.get(CONF_PREFIX, "").strip()
-                if user_input.get(CONF_RENAME_ENTITY_IDS):
-                    rename_entity_ids(self.hass, self.config_entry, device_name(self.config_entry.title, prefix))
                 return self.async_create_entry(
                     data={
-                        CONF_PREFIX: prefix,
+                        **self.config_entry.options,
                         CONF_PTZ_STEP_MS: int(user_input[CONF_PTZ_STEP_MS]),
                         CONF_PRESETS: user_input.get(CONF_PRESETS, ""),
                     }
@@ -206,7 +209,6 @@ class CtronicsOptionsFlow(OptionsFlowWithReload):
         current = user_input or self.config_entry.options
         schema = vol.Schema(
             {
-                vol.Optional(CONF_PREFIX, default=current.get(CONF_PREFIX, "")): selector.TextSelector(),
                 vol.Required(
                     CONF_PTZ_STEP_MS, default=current.get(CONF_PTZ_STEP_MS, DEFAULT_PTZ_STEP_MS)
                 ): selector.NumberSelector(
@@ -217,7 +219,6 @@ class CtronicsOptionsFlow(OptionsFlowWithReload):
                 vol.Optional(CONF_PRESETS, default=current.get(CONF_PRESETS, "")): selector.TextSelector(
                     selector.TextSelectorConfig(multiline=True)
                 ),
-                vol.Optional(CONF_RENAME_ENTITY_IDS, default=False): selector.BooleanSelector(),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

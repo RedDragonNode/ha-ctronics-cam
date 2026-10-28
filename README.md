@@ -34,9 +34,9 @@ Der Sensor `Bewegung` zeigt die **normale Bewegungserkennung** der Kamera. Die K
 
 ### Präfix für den Namen
 
-Beim Einrichten gibt es das optionale Feld **Präfix**. Es wird dem Namen der Kamera vorangestellt: Aus dem Präfix `Spielzimmer` und dem Namen `Fuchsrevier` wird das Gerät **Spielzimmer Fuchsrevier**, und die Entity-IDs beginnen mit `spielzimmer_fuchsrevier` (zum Beispiel `camera.spielzimmer_fuchsrevier`). Das hilft, wenn gleiche Kameranamen schon von einer anderen Integration belegt sind.
+Beim Hinzufügen einer Kamera ist das Feld **Präfix** ein Pflichtfeld. Es wird dem Namen der Kamera vorangestellt: Aus dem Präfix `Spielzimmer` und dem Namen `Fuchsrevier` wird das Gerät **Spielzimmer Fuchsrevier**, und die Entity-IDs beginnen mit `spielzimmer_fuchsrevier` (zum Beispiel `camera.spielzimmer_fuchsrevier`). So bleiben die IDs eindeutig, auch wenn gleiche Namen schon von einer anderen Integration belegt sind.
 
-Das Präfix lässt sich jederzeit unter **Konfigurieren** ändern. Das ändert den Gerätenamen und damit die Anzeigenamen aller Entities. Die Entity-IDs ändert Home Assistant dabei nicht von selbst. Wer sie auch anpassen will, setzt in den Optionen den Haken **Entity-IDs umbenennen**. Das passiert einmalig, bereits vergebene IDs bleiben unberührt. Automationen, Skripte und Dashboards, die eine alte ID nennen, werden **nicht** angepasst, die musst du danach selbst nachziehen.
+Das Präfix wird nur beim Hinzufügen vergeben. Unter **Konfigurieren** und beim Ändern der Verbindung gibt es das Feld nicht mehr. Kameras, die vor dieser Pflicht ohne Präfix eingerichtet wurden, laufen unverändert weiter.
 
 ### Preset-Positionen
 
@@ -53,7 +53,7 @@ Danach erscheint das Auswahlfeld `Preset-Position`. Speichern und Löschen läuf
 
 - **Sensor „Bewegung“ ist nicht verfügbar.** Die Kamera meldet Bewegung nur, solange ihr ONVIF-Dienst läuft. Dieser Dienst kann bei den Kameras von selbst wegbrechen, Stream, Schnappschuss und Steuerung laufen dann weiter. Die Integration versucht es mit wachsenden Pausen neu und zeigt nach einigen Minuten unter **Einstellungen → System → Reparaturen** einen Hinweis. Meist hilft es, die Kamera kurz vom Strom zu trennen. Ein Ausschalten und Einschalten von ONVIF in den Kameraeinstellungen reicht nicht.
 - **Im Log steht, die Adresse sei zu lang.** Die interne URL von Home Assistant darf höchstens 35 Zeichen haben, siehe oben.
-- **Entity-IDs enden auf `_2`.** Das passiert, wenn dieselben Namen schon von einer anderen Integration belegt sind. Gib der Kamera beim Einrichten ein Präfix (siehe oben) oder ändere die IDs in den Entity-Einstellungen.
+- **Entity-IDs enden auf `_2`.** Das passiert, wenn dieselben Namen schon von einer anderen Integration belegt sind. Neue Kameras bekommen deshalb beim Hinzufügen ein Pflicht-Präfix (siehe oben). Bei einer schon eingerichteten Kamera änderst du die IDs in den Entity-Einstellungen.
 
 ## Installation (HACS)
 
@@ -72,7 +72,7 @@ Local integration for **Ctronics 4K pan/tilt cameras** running Hipcam firmware (
 
 **Features:** RTSP live stream and snapshot, PTZ buttons, a selector for named presets, switches for AI detection and auto tracking, detection type and threshold, night vision LEDs, flip and mirror, a motion `binary_sensor` via ONVIF events (general motion, the camera does not report persons separately), SD card diagnostics, four PTZ services, DHCP discovery, reauth, reconfigure and diagnostics.
 
-**Name prefix:** the optional *Prefix* field puts a word in front of the camera name, so "Playroom" and "Fox den" become the device "Playroom Fox den" with entity IDs starting with `playroom_fox_den`. It can be changed later under *Configure*; a tick box there can rename the entity IDs once as well (automations and dashboards that use an old ID are not updated).
+**Name prefix:** when adding a camera the *Prefix* field is required. It puts a word in front of the camera name, so "Playroom" and "Fox den" become the device "Playroom Fox den" with entity IDs starting with `playroom_fox_den`. It is set only when the camera is added and cannot be changed afterwards. Cameras set up without one keep working.
 
 **Motion events** are pushed by the camera to a Home Assistant webhook, so Home Assistant needs an internal URL using plain HTTP that the camera can reach.
 
