@@ -10,11 +10,19 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_WEBHOOK_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ctronics_cam.api import CtronicsAuthError, CtronicsConnectionError
-from custom_components.ctronics_cam.const import CONF_PRESETS, CONF_PTZ_STEP_MS, DOMAIN
+from custom_components.ctronics_cam.const import (
+    CONF_PREFIX,
+    CONF_PRESETS,
+    CONF_PTZ_STEP_MS,
+    CONF_RENAME_ENTITY_IDS,
+    DOMAIN,
+)
 
 from .conftest import HOST, MAC
 
@@ -50,6 +58,19 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, mock_api: MagicMock)
     assert result["data"][CONF_PASSWORD] == "geheim"
     assert len(result["data"][CONF_WEBHOOK_ID]) == 12
     assert result["result"].unique_id == MAC
+    assert result["options"] == {CONF_PREFIX: ""}
+
+
+@pytest.mark.usefixtures("mock_setup_entry")
+async def test_user_flow_stores_prefix(hass: HomeAssistant, mock_api: MagicMock) -> None:
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**USER_INPUT, CONF_PREFIX: " Spielzimmer "}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Flur"
+    assert result["options"] == {CONF_PREFIX: "Spielzimmer"}
 
 
 @pytest.mark.usefixtures("mock_setup_entry")
@@ -189,4 +210,64 @@ async def test_options_flow_rejects_bad_presets_then_saves(
         result["flow_id"], {CONF_PTZ_STEP_MS: 500, CONF_PRESETS: "1: Schaukel\n10: Bett"}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert setup_integration.options == {CONF_PTZ_STEP_MS: 500, CONF_PRESETS: "1: Schaukel\n10: Bett"}
+    assert setup_integration.options == {
+        CONF_PREFIX: "",
+        CONF_PTZ_STEP_MS: 500,
+        CONF_PRESETS: "1: Schaukel\n10: Bett",
+    }
+
+
+async def _set_prefix(hass: HomeAssistant, entry: MockConfigEntry, prefix: str, *, rename_ids: bool) -> None:
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_PREFIX: prefix, CONF_PTZ_STEP_MS: 400, CONF_PRESETS: "", CONF_RENAME_ENTITY_IDS: rename_ids},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+
+async def test_options_prefix_changes_names_but_keeps_entity_ids(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    await _set_prefix(hass, setup_integration, "Spielzimmer", rename_ids=False)
+
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, MAC), setup_integration.entry_id)
+    assert device is not None
+    assert device.name == "Spielzimmer Flur"
+    assert hass.states.get("camera.flur").attributes["friendly_name"] == "Spielzimmer Flur"
+    assert hass.states.get("camera.spielzimmer_flur") is None
+
+
+async def test_options_prefix_can_rename_entity_ids(hass: HomeAssistant, setup_integration: MockConfigEntry) -> None:
+    await _set_prefix(hass, setup_integration, "Spielzimmer", rename_ids=True)
+
+    registry = er.async_get(hass)
+    assert hass.states.get("camera.spielzimmer_flur") is not None
+    assert hass.states.get("switch.spielzimmer_flur_auto_tracking") is not None
+    assert hass.states.get("binary_sensor.spielzimmer_flur_motion") is not None
+    assert not registry.async_is_registered("camera.flur")
+    assert not registry.async_is_registered("switch.flur_auto_tracking")
+
+    # Ein zweiter Wechsel baut auf den bereits umbenannten IDs auf
+    await _set_prefix(hass, setup_integration, "Bad", rename_ids=True)
+    assert hass.states.get("camera.bad_flur") is not None
+    assert not registry.async_is_registered("camera.spielzimmer_flur")
+
+
+async def test_options_rename_skips_taken_entity_ids(hass: HomeAssistant, setup_integration: MockConfigEntry) -> None:
+    registry = er.async_get(hass)
+    registry.async_get_or_create("camera", "other", "belegt", suggested_object_id="spielzimmer_flur")
+
+    await _set_prefix(hass, setup_integration, "Spielzimmer", rename_ids=True)
+
+    assert registry.async_is_registered("camera.flur")
+    assert hass.states.get("switch.spielzimmer_flur_auto_tracking") is not None
+
+
+async def test_options_rename_without_prefix_change_does_nothing(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    await _set_prefix(hass, setup_integration, "", rename_ids=True)
+
+    assert hass.states.get("camera.flur") is not None

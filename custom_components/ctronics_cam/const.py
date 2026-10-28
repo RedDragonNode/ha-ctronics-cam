@@ -22,6 +22,8 @@ PLATFORMS: list[Platform] = [
 
 CONF_PTZ_STEP_MS = "ptz_step_ms"
 CONF_PRESETS = "presets"
+CONF_PREFIX = "prefix"
+CONF_RENAME_ENTITY_IDS = "rename_entity_ids"
 
 DEFAULT_NAME = "Ctronics 4K Cam"
 DEFAULT_PORT = 80

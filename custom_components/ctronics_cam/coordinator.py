@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import CtronicsApi, CtronicsAuthError, CtronicsError
 from .const import DEFAULT_PTZ_SPEED, DOMAIN, LOGGER, REFRESH_COOLDOWN, UPDATE_INTERVAL
+from .naming import entry_device_name
 
 if TYPE_CHECKING:
     from .events import CtronicsEvents
@@ -136,7 +137,7 @@ class CtronicsCoordinator(DataUpdateCoordinator[CameraState]):
             manufacturer="Ctronics",
             model="4K Pan/Tilt Camera",
             model_id=state.model or None,
-            name=entry.title,
+            name=entry_device_name(entry),
             sw_version=state.firmware or None,
             hw_version=state.hardware or None,
             configuration_url=self.api.base_url,

@@ -12,7 +12,8 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ctronics_cam.api import CtronicsAuthError, CtronicsConnectionError
-from custom_components.ctronics_cam.const import DOMAIN
+from custom_components.ctronics_cam.const import CONF_PREFIX, DOMAIN
+from custom_components.ctronics_cam.naming import device_name
 
 from .conftest import MAC
 
@@ -34,6 +35,28 @@ async def test_setup_and_unload(hass: HomeAssistant, setup_integration: MockConf
     await hass.async_block_till_done()
     assert setup_integration.state is ConfigEntryState.NOT_LOADED
     mock_onvif.subscribe.assert_awaited_once()
+
+
+async def test_prefix_is_part_of_device_name_and_entity_ids(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
+) -> None:
+    hass.config.internal_url = "http://192.168.1.2:8123"
+    mock_config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(mock_config_entry, options={CONF_PREFIX: "Spielzimmer"})
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, MAC), mock_config_entry.entry_id)
+    assert device is not None
+    assert device.name == "Spielzimmer Flur"
+    assert hass.states.get("camera.spielzimmer_flur") is not None
+    assert hass.states.get("switch.spielzimmer_flur_auto_tracking") is not None
+
+
+def test_device_name_joins_prefix_and_title() -> None:
+    assert device_name("Flur", None) == "Flur"
+    assert device_name("Flur", "") == "Flur"
+    assert device_name("Flur", "  Spielzimmer ") == "Spielzimmer Flur"
 
 
 async def test_substream_is_disabled_by_default(hass: HomeAssistant, setup_integration: MockConfigEntry) -> None:

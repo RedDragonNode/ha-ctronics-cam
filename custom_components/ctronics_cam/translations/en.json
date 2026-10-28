@@ -7,6 +7,7 @@
         "description": "Enter the address and login of the camera. The same login is used in the Ctronics Pro app and in the camera's web interface.",
         "data": {
           "name": "Name",
+          "prefix": "Prefix",
           "host": "IP address",
           "port": "HTTP port",
           "username": "Username",
@@ -14,6 +15,7 @@
         },
         "data_description": {
           "name": "Shown as the device name in Home Assistant.",
+          "prefix": "Optional. Put in front of the name: \"Playroom\" and \"Fox den\" become \"Playroom Fox den\", and the entity IDs then start with playroom_fox_den. Can be changed later in the options.",
           "host": "Fixed IP address of the camera, ideally reserved in your router.",
           "port": "Port of the camera's web interface, normally 80."
         }
@@ -54,10 +56,14 @@
       "init": {
         "title": "Ctronics 4K Cam options",
         "data": {
+          "prefix": "Prefix",
           "ptz_step_ms": "Step duration of the direction buttons",
-          "presets": "Preset positions"
+          "presets": "Preset positions",
+          "rename_entity_ids": "Rename entity IDs"
         },
         "data_description": {
+          "prefix": "Put in front of the camera name, for example \"Playroom\". Leave empty for no prefix. Changes the device name and with it the display name of every entity.",
+          "rename_entity_ids": "Also changes the entity IDs once to match the new name, camera.fox_den becomes camera.playroom_fox_den. Note: automations, scripts and dashboards that use an old ID are not updated. Without the tick the IDs stay as they are.",
           "ptz_step_ms": "How long the camera moves when a direction button is pressed.",
           "presets": "One position per line as number and name, for example \"1: Swing\". Numbers go from 1 to 64. The positions themselves are stored in the camera. If you list any, a preset selector appears."
         }
