@@ -24,7 +24,11 @@ Entwickelt und geprüft mit dem Modellcode `C6F0SpZ0N0PpL2`, Firmware `V30.1.60.
 | Diagnose | SD-Karte: Status, freier Platz, Kapazität (nur wenn eine Karte steckt) |
 | Dienste | `ctronics_cam.ptz_move`, `ptz_goto_preset`, `ptz_save_preset`, `ptz_delete_preset` |
 
-Die Einrichtung läuft über die Oberfläche, mit Erkennung neuer Kameras im Netz (DHCP), neuer Anmeldung (Reauth), Verbindung ändern (Reconfigure) und Diagnose-Download.
+Die Einrichtung läuft über die Oberfläche, mit Suche nach Kameras im Heimnetz, neuer Anmeldung (Reauth), Verbindung ändern (Reconfigure) und Diagnose-Download.
+
+### Kameras finden
+
+Beim Hinzufügen fragt die Integration alle Adressen in deinem Heimnetz (das /24-Netz von Home Assistant) ab und listet jede Kamera, die auf ihre Weboberfläche mit der Kamera-Anmeldung antwortet, und die noch nicht eingerichtet ist. Du wählst eine aus oder trägst die IP-Adresse von Hand ein. Das dauert wenige Sekunden. Die Suche hängt nicht an der MAC-Adresse, die bei Kameras dieser Bauart nicht einheitlich beginnt. Zusätzlich schlägt Home Assistant Kameras vor, die per DHCP mit dem MAC-Anfang `00:0F:97` auffallen. Kameras in einem anderen Netz, etwa einem Gäste-VLAN, findest du nur über die Eingabe von Hand.
 
 ### Bewegung und Personen
 
@@ -60,7 +64,7 @@ Danach erscheint das Auswahlfeld `Preset-Position`. Speichern und Löschen läuf
 1. HACS öffnen, oben rechts **Benutzerdefinierte Repositories** wählen.
 2. `https://github.com/RedDragonNode/ha-ctronics-cam` als Typ **Integration** hinzufügen.
 3. **Ctronics 4K Cam** herunterladen und Home Assistant neu starten.
-4. Unter **Einstellungen → Geräte & Dienste** die Integration hinzufügen. Neue Kameras werden oft automatisch vorgeschlagen.
+4. Unter **Einstellungen → Geräte & Dienste** die Integration hinzufügen. Die Kameras im Heimnetz stehen dann zur Auswahl.
 
 Du brauchst IP-Adresse, Benutzername und Passwort der Kamera, dieselben wie in der Ctronics-Pro-App. Reserviere die IP-Adresse im Router.
 
@@ -70,7 +74,7 @@ Du brauchst IP-Adresse, Benutzername und Passwort der Kamera, dieselben wie in d
 
 Local integration for **Ctronics 4K pan/tilt cameras** running Hipcam firmware (Hi3510 CGI, RTSP, ONVIF), for example the indoor camera with auto tracking and AI detection. Everything runs on your LAN, no cloud and no account needed. Protocol notes: [docs/protocol.md](docs/protocol.md).
 
-**Features:** RTSP live stream and snapshot, PTZ buttons, a selector for named presets, switches for AI detection and auto tracking, detection type and threshold, night vision LEDs, flip and mirror, a motion `binary_sensor` via ONVIF events (general motion, the camera does not report persons separately), SD card diagnostics, four PTZ services, DHCP discovery, reauth, reconfigure and diagnostics.
+**Features:** RTSP live stream and snapshot, PTZ buttons, a selector for named presets, switches for AI detection and auto tracking, detection type and threshold, night vision LEDs, flip and mirror, a motion `binary_sensor` via ONVIF events (general motion, the camera does not report persons separately), SD card diagnostics, four PTZ services, a network scan that lists the cameras on your home network when you add one, DHCP discovery, reauth, reconfigure and diagnostics.
 
 **Name prefix:** when adding a camera the *Prefix* field is required. It puts a word in front of the camera name, so "Playroom" and "Fox den" become the device "Playroom Fox den" with entity IDs starting with `playroom_fox_den`. It is set only when the camera is added and cannot be changed afterwards. Cameras set up without one keep working.
 

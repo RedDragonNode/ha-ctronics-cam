@@ -8,10 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_WEBHOOK_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.selector import TextSelector
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -33,6 +35,20 @@ def mock_setup_entry() -> Generator[AsyncMock]:
         yield mock
 
 
+@pytest.fixture(autouse=True)
+def mock_scan() -> Generator[AsyncMock]:
+    """Die Netzsuche der Einrichtung findet eine Kamera, ohne das Netz wirklich abzusuchen."""
+    with patch("custom_components.ctronics_cam.config_flow.async_find_cameras", return_value=[HOST]) as mock:
+        yield mock
+
+
+async def _pick_camera(hass: HomeAssistant, host: str = HOST) -> ConfigFlowResult:
+    """Wählt im ersten Schritt die Kamera und liefert das Formular mit den Zugangsdaten."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert result["step_id"] == "user"
+    return await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_HOST: host})
+
+
 USER_INPUT = {
     CONF_NAME: "Flur",
     CONF_PREFIX: "Haus",
@@ -45,9 +61,9 @@ USER_INPUT = {
 
 @pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_creates_entry(hass: HomeAssistant, mock_api: MagicMock) -> None:
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass)
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "credentials"
 
     result = await hass.config_entries.flow.async_configure(result["flow_id"], USER_INPUT)
 
@@ -63,7 +79,7 @@ async def test_user_flow_creates_entry(hass: HomeAssistant, mock_api: MagicMock)
 
 @pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_strips_prefix(hass: HomeAssistant, mock_api: MagicMock) -> None:
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**USER_INPUT, CONF_PREFIX: " Spielzimmer "}
     )
@@ -75,7 +91,7 @@ async def test_user_flow_strips_prefix(hass: HomeAssistant, mock_api: MagicMock)
 
 @pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_requires_prefix(hass: HomeAssistant, mock_api: MagicMock) -> None:
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass)
     prefix_field = next(key for key in result["data_schema"].schema if key == CONF_PREFIX)
     assert isinstance(prefix_field, vol.Required)
 
@@ -89,10 +105,44 @@ async def test_user_flow_requires_prefix(hass: HomeAssistant, mock_api: MagicMoc
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
 
+async def test_user_step_offers_found_cameras_that_are_not_set_up_yet(
+    hass: HomeAssistant, mock_scan: AsyncMock, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    mock_scan.return_value = [HOST, "192.168.1.51", "192.168.1.52"]
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["description_placeholders"] == {"count": "2"}
+    host_selector = result["data_schema"].schema[CONF_HOST]
+    assert host_selector.config["options"] == ["192.168.1.51", "192.168.1.52"]
+    assert host_selector.config["custom_value"] is True
+
+
+async def test_user_step_without_found_cameras_asks_for_the_address(hass: HomeAssistant, mock_scan: AsyncMock) -> None:
+    mock_scan.return_value = []
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    assert result["step_id"] == "user"
+    assert result["description_placeholders"] == {"count": "0"}
+    assert isinstance(result["data_schema"].schema[CONF_HOST], TextSelector)
+
+
+async def test_user_step_passes_the_typed_address_on(hass: HomeAssistant) -> None:
+    result = await _pick_camera(hass, " 192.168.1.9 ")
+
+    assert result["step_id"] == "credentials"
+    host_field = next(key for key in result["data_schema"].schema if key == CONF_HOST)
+    assert host_field.default() == "192.168.1.9"
+
+
 @pytest.mark.usefixtures("mock_setup_entry")
 async def test_user_flow_cannot_connect_then_recovers(hass: HomeAssistant, mock_api: MagicMock) -> None:
     mock_api.get_params.side_effect = CtronicsConnectionError("down")
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], USER_INPUT)
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "cannot_connect"}
@@ -105,7 +155,7 @@ async def test_user_flow_cannot_connect_then_recovers(hass: HomeAssistant, mock_
 
 async def test_user_flow_invalid_auth(hass: HomeAssistant, mock_api: MagicMock) -> None:
     mock_api.get_params.side_effect = CtronicsAuthError("nein")
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], USER_INPUT)
     assert result["errors"] == {"base": "invalid_auth"}
 
@@ -113,7 +163,7 @@ async def test_user_flow_invalid_auth(hass: HomeAssistant, mock_api: MagicMock) 
 async def test_user_flow_unknown_device(hass: HomeAssistant, mock_api: MagicMock) -> None:
     mock_api.get_params.side_effect = None
     mock_api.get_params.return_value = {"model": "irgendwas"}
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], USER_INPUT)
     assert result["errors"] == {"base": "unknown_device"}
 
@@ -123,7 +173,7 @@ async def test_user_flow_already_configured_updates_host(
     hass: HomeAssistant, mock_api: MagicMock, mock_config_entry: MockConfigEntry
 ) -> None:
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await _pick_camera(hass, "192.168.1.77")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**USER_INPUT, CONF_HOST: "192.168.1.77"}
     )
@@ -133,14 +183,15 @@ async def test_user_flow_already_configured_updates_host(
 
 
 @pytest.mark.usefixtures("mock_setup_entry")
-async def test_dhcp_discovery_prefills_host(hass: HomeAssistant, mock_api: MagicMock) -> None:
+async def test_dhcp_discovery_prefills_host(hass: HomeAssistant, mock_api: MagicMock, mock_scan: AsyncMock) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": config_entries.SOURCE_DHCP},
         data=DhcpServiceInfo(ip="192.168.1.60", hostname="ipcam", macaddress="000f97aabbcc"),
     )
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "credentials"
+    mock_scan.assert_not_awaited()
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**USER_INPUT, CONF_HOST: "192.168.1.60"}

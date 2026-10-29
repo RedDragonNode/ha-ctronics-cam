@@ -28,6 +28,7 @@ from .const import (
     EVENT_WEBHOOK_ID_LENGTH,
 )
 from .coordinator import CtronicsConfigEntry
+from .discovery import async_find_cameras
 from .presets import parse_presets
 
 
@@ -77,6 +78,30 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
         return {}, mac
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Kamera im Heimnetz auswählen oder ihre Adresse von Hand eintragen."""
+        if user_input is not None:
+            self._discovered_host = user_input[CONF_HOST].strip()
+            return await self.async_step_credentials()
+
+        configured = {entry.data.get(CONF_HOST) for entry in self._async_current_entries()}
+        found = [host for host in await async_find_cameras(self.hass) if host not in configured]
+        host_selector = (
+            selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=found, custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN
+                )
+            )
+            if found
+            else selector.TextSelector()
+        )
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({vol.Required(CONF_HOST): host_selector}),
+            description_placeholders={"count": str(len(found))},
+        )
+
+    async def async_step_credentials(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Name, Präfix und Zugangsdaten der Kamera."""
         errors: dict[str, str] = {}
         mac: str | None = None
         if user_input is not None:
@@ -107,7 +132,7 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
         if self._discovered_host and CONF_HOST not in defaults:
             defaults[CONF_HOST] = self._discovered_host
         return self.async_show_form(
-            step_id="user",
+            step_id="credentials",
             data_schema=_credentials_schema(defaults, with_name=True),
             errors=errors,
         )
@@ -118,7 +143,7 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
         self._discovered_host = discovery_info.ip
         self.context["title_placeholders"] = {"host": discovery_info.ip}
-        return await self.async_step_user()
+        return await self.async_step_credentials()
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()

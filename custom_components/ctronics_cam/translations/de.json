@@ -4,7 +4,17 @@
     "step": {
       "user": {
         "title": "Ctronics-Kamera hinzufügen",
-        "description": "Gib Adresse und Zugangsdaten der Kamera ein. Es sind dieselben wie in der Ctronics-Pro-App und in der Weboberfläche der Kamera.",
+        "description": "Im Heimnetz wurden {count} Kameras gefunden, die noch nicht eingerichtet sind. Wähle eine aus oder trage die IP-Adresse von Hand ein.",
+        "data": {
+          "host": "IP-Adresse"
+        },
+        "data_description": {
+          "host": "Gefundene Kameras stehen in der Liste. Eine Kamera, die dort fehlt, kannst du von Hand eintragen."
+        }
+      },
+      "credentials": {
+        "title": "Zugangsdaten der Kamera",
+        "description": "Gib Name, Präfix und Zugangsdaten der Kamera ein. Es sind dieselben wie in der Ctronics-Pro-App und in der Weboberfläche der Kamera.",
         "data": {
           "name": "Name",
           "prefix": "Präfix",

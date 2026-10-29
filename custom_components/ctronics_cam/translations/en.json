@@ -4,7 +4,17 @@
     "step": {
       "user": {
         "title": "Add Ctronics camera",
-        "description": "Enter the address and login of the camera. The same login is used in the Ctronics Pro app and in the camera's web interface.",
+        "description": "{count} cameras that are not set up yet were found on your home network. Pick one or enter the IP address by hand.",
+        "data": {
+          "host": "IP address"
+        },
+        "data_description": {
+          "host": "Cameras that were found are in the list. A camera that is missing there can be entered by hand."
+        }
+      },
+      "credentials": {
+        "title": "Camera login",
+        "description": "Enter the name, prefix and login of the camera. The same login is used in the Ctronics Pro app and in the camera's web interface.",
         "data": {
           "name": "Name",
           "prefix": "Prefix",

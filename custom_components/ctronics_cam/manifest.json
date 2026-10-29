@@ -3,12 +3,12 @@
   "name": "Ctronics 4K Cam",
   "codeowners": ["@RedDragonNode"],
   "config_flow": true,
-  "dependencies": ["webhook"],
+  "dependencies": ["network", "webhook"],
   "dhcp": [{ "macaddress": "000F97*" }],
   "documentation": "https://github.com/RedDragonNode/ha-ctronics-cam",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/RedDragonNode/ha-ctronics-cam/issues",
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }

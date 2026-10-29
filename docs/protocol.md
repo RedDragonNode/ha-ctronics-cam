@@ -12,6 +12,8 @@ Stand der Prüfung steht jeweils in der letzten Spalte: **gelesen** = an der Kam
 | 554 | RTSP (`Hipcam RealServer/V1.0`) | Digest, Pfade `/11` (Main, 3840x2160 H.264) und `/12` (Sub, 1280x720 H.264) |
 | 8080 | ONVIF (Device, Media, PTZ, Events, Imaging, Analytics) | WS-UsernameToken (Digest), schon `GetSystemDateAndTime` verlangt Anmeldung |
 
+Ohne Anmeldung antwortet `GET /` auf Port 80 mit HTTP 401 und `WWW-Authenticate: Basic realm="index.html"`. Daran erkennt die Netzsuche der Einrichtung die Kameras. Die MAC-Adresse taugt dafür nicht: Sieben Kameras im selben Netz hatten sieben verschiedene Anfänge (`00:0F:97`, `00:0F:C1`, `00:69:F7`, `00:9A:7F`, `00:DC:CE`, `00:E4:1A`, `00:E5:F0`).
+
 Unbekannte CGI-Befehle antworten mit HTTP 404, bekannte mit falschen Parametern mit `[Error]Param error.`. So lässt sich die Existenz eines Befehls prüfen.
 
 ## CGI: Format
