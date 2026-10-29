@@ -9,7 +9,15 @@ import pytest
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_WEBHOOK_ID
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_MAC,
+    CONF_NAME,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_USERNAME,
+    CONF_WEBHOOK_ID,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
@@ -39,6 +47,13 @@ def mock_setup_entry() -> Generator[AsyncMock]:
 def mock_scan() -> Generator[AsyncMock]:
     """Die Netzsuche der Einrichtung findet eine Kamera, ohne das Netz wirklich abzusuchen."""
     with patch("custom_components.ctronics_cam.config_flow.async_find_cameras", return_value=[HOST]) as mock:
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_start_discovery_flows() -> Generator[AsyncMock]:
+    """Die Einrichtung legt für gefundene Kameras Entdeckungen an, hier ohne dass wirklich welche entstehen."""
+    with patch("custom_components.ctronics_cam.config_flow.async_start_discovery_flows") as mock:
         yield mock
 
 
@@ -121,6 +136,18 @@ async def test_user_step_offers_found_cameras_that_are_not_set_up_yet(
     assert host_selector.config["custom_value"] is True
 
 
+async def test_user_step_starts_a_discovery_for_every_found_camera(
+    hass: HomeAssistant, mock_scan: AsyncMock, mock_start_discovery_flows: AsyncMock, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    mock_scan.return_value = [HOST, "192.168.1.51"]
+
+    await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+
+    # Auch die schon eingerichtete Kamera geht mit: Ihre Entdeckung bricht Home Assistant über die MAC-Adresse ab
+    mock_start_discovery_flows.assert_awaited_once_with(hass, [HOST, "192.168.1.51"])
+
+
 async def test_user_step_without_found_cameras_asks_for_the_address(hass: HomeAssistant, mock_scan: AsyncMock) -> None:
     mock_scan.return_value = []
 
@@ -201,6 +228,61 @@ async def test_dhcp_discovery_prefills_host(hass: HomeAssistant, mock_api: Magic
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["result"].unique_id == MAC
+
+
+@pytest.mark.usefixtures("mock_setup_entry")
+async def test_integration_discovery_offers_the_camera_and_creates_the_entry(
+    hass: HomeAssistant, mock_api: MagicMock, mock_scan: AsyncMock
+) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_INTEGRATION_DISCOVERY},
+        data={CONF_HOST: "192.168.1.60", CONF_MAC: MAC},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "credentials"
+    mock_scan.assert_not_awaited()
+    assert hass.config_entries.flow.async_get(result["flow_id"])["context"]["title_placeholders"] == {
+        "host": "192.168.1.60"
+    }
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**USER_INPUT, CONF_HOST: "192.168.1.60"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == MAC
+
+
+@pytest.mark.usefixtures("mock_setup_entry")
+async def test_integration_discovery_of_known_camera_updates_host(
+    hass: HomeAssistant, mock_api: MagicMock, mock_config_entry: MockConfigEntry
+) -> None:
+    mock_config_entry.add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_INTEGRATION_DISCOVERY},
+        data={CONF_HOST: "192.168.1.99", CONF_MAC: MAC.upper()},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert mock_config_entry.data[CONF_HOST] == "192.168.1.99"
+
+
+@pytest.mark.usefixtures("mock_setup_entry")
+async def test_choosing_a_camera_in_the_dialog_replaces_its_discovery(hass: HomeAssistant, mock_api: MagicMock) -> None:
+    discovery = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_INTEGRATION_DISCOVERY},
+        data={CONF_HOST: HOST, CONF_MAC: MAC},
+    )
+    assert hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+
+    result = await _pick_camera(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], USER_INPUT)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert hass.config_entries.flow.async_progress_by_handler(DOMAIN) == []
+    assert discovery["flow_id"] not in {flow["flow_id"] for flow in hass.config_entries.flow.async_progress()}
 
 
 @pytest.mark.usefixtures("mock_setup_entry")

@@ -34,6 +34,8 @@ MAX_PTZ_SPEED = 8
 MAX_PRESET = 64
 
 UPDATE_INTERVAL = timedelta(seconds=30)
+# Wie oft nach neuen Kameras im Heimnetz gesucht wird
+DISCOVERY_INTERVAL = timedelta(hours=1)
 REFRESH_COOLDOWN = 1.0
 
 RTSP_MAIN_PATH = "11"

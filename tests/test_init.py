@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_OFF
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.ctronics_cam.api import CtronicsAuthError, CtronicsConnectionError
-from custom_components.ctronics_cam.const import CONF_PREFIX, DOMAIN
+from custom_components.ctronics_cam.const import CONF_PREFIX, DISCOVERY_INTERVAL, DOMAIN
 from custom_components.ctronics_cam.naming import device_name
 
 from .conftest import MAC
@@ -35,6 +37,17 @@ async def test_setup_and_unload(hass: HomeAssistant, setup_integration: MockConf
     await hass.async_block_till_done()
     assert setup_integration.state is ConfigEntryState.NOT_LOADED
     mock_onvif.subscribe.assert_awaited_once()
+
+
+async def test_setup_looks_for_cameras_at_start_and_every_hour(
+    hass: HomeAssistant, setup_integration: MockConfigEntry, mock_discover_cameras: AsyncMock
+) -> None:
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert mock_discover_cameras.await_count == 1
+
+    async_fire_time_changed(hass, dt_util.utcnow() + DISCOVERY_INTERVAL + timedelta(seconds=1))
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert mock_discover_cameras.await_count == 2
 
 
 async def test_prefix_is_part_of_device_name_and_entity_ids(

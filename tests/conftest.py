@@ -54,6 +54,13 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Lässt Home Assistant die Integration aus `custom_components` laden."""
 
 
+@pytest.fixture(autouse=True)
+def mock_discover_cameras() -> Generator[AsyncMock]:
+    """Verhindert, dass der Start der Integration das Netz wirklich nach Kameras absucht."""
+    with patch("custom_components.ctronics_cam.async_discover_cameras") as mock:
+        yield mock
+
+
 @pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
     return MockConfigEntry(

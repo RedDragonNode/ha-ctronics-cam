@@ -2,14 +2,43 @@
 
 from __future__ import annotations
 
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_USERNAME,
+    EVENT_HOMEASSISTANT_STOP,
+)
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.start import async_at_started
+from homeassistant.helpers.typing import ConfigType
 
 from .api import CtronicsApi
-from .const import LOGGER, PLATFORMS
+from .const import DISCOVERY_INTERVAL, DOMAIN, LOGGER, PLATFORMS
 from .coordinator import CtronicsConfigEntry, CtronicsCoordinator, CtronicsRuntimeData
+from .discovery import async_discover_cameras
 from .events import CtronicsEvents
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Sucht nach dem Start und danach regelmäßig nach Kameras im Heimnetz."""
+
+    async def discover(*_: object) -> None:
+        await async_discover_cameras(hass)
+
+    @callback
+    def stop_discovery(_event: Event) -> None:
+        cancel_timer()
+
+    async_at_started(hass, discover)
+    cancel_timer = async_track_time_interval(hass, discover, DISCOVERY_INTERVAL, name="Ctronics 4K Cam: Kameras suchen")
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_discovery)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: CtronicsConfigEntry) -> bool:

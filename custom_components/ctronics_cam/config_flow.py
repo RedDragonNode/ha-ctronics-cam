@@ -7,8 +7,16 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_WEBHOOK_ID
+from homeassistant.config_entries import SOURCE_USER, ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
+from homeassistant.const import (
+    CONF_HOST,
+    CONF_MAC,
+    CONF_NAME,
+    CONF_PASSWORD,
+    CONF_PORT,
+    CONF_USERNAME,
+    CONF_WEBHOOK_ID,
+)
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -28,7 +36,7 @@ from .const import (
     EVENT_WEBHOOK_ID_LENGTH,
 )
 from .coordinator import CtronicsConfigEntry
-from .discovery import async_find_cameras
+from .discovery import async_find_cameras, async_start_discovery_flows
 from .presets import parse_presets
 
 
@@ -83,8 +91,11 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
             self._discovered_host = user_input[CONF_HOST].strip()
             return await self.async_step_credentials()
 
+        found = await async_find_cameras(self.hass)
+        # Die gefundenen Kameras erscheinen auch einzeln unter "Entdeckt"
+        await async_start_discovery_flows(self.hass, found)
         configured = {entry.data.get(CONF_HOST) for entry in self._async_current_entries()}
-        found = [host for host in await async_find_cameras(self.hass) if host not in configured]
+        found = [host for host in found if host not in configured]
         host_selector = (
             selector.SelectSelector(
                 selector.SelectSelectorConfig(
@@ -111,7 +122,8 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 errors, mac = await self._async_validate(user_input)
             if not errors and mac:
-                await self.async_set_unique_id(mac)
+                # Wer die Kamera selbst wählt, darf weitermachen, auch wenn dazu schon eine Entdeckung läuft
+                await self.async_set_unique_id(mac, raise_on_progress=self.source != SOURCE_USER)
                 self._abort_if_unique_id_configured(
                     updates={CONF_HOST: user_input[CONF_HOST], CONF_PORT: int(user_input[CONF_PORT])}
                 )
@@ -137,13 +149,21 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def _async_step_discovered(self, mac: str, host: str) -> ConfigFlowResult:
+        """Eine Kamera wurde entdeckt: bekannte Kameras bekommen nur die neue Adresse, neue die Zugangsdaten."""
+        await self.async_set_unique_id(format_mac(mac))
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+        self._discovered_host = host
+        self.context["title_placeholders"] = {"host": host}
+        return await self.async_step_credentials()
+
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> ConfigFlowResult:
         """Eine Kamera dieser Bauart ist im Netz aufgetaucht."""
-        await self.async_set_unique_id(format_mac(discovery_info.macaddress))
-        self._abort_if_unique_id_configured(updates={CONF_HOST: discovery_info.ip})
-        self._discovered_host = discovery_info.ip
-        self.context["title_placeholders"] = {"host": discovery_info.ip}
-        return await self.async_step_credentials()
+        return await self._async_step_discovered(discovery_info.macaddress, discovery_info.ip)
+
+    async def async_step_integration_discovery(self, discovery_info: dict[str, Any]) -> ConfigFlowResult:
+        """Die Netzsuche der Integration hat eine Kamera gefunden."""
+        return await self._async_step_discovered(discovery_info[CONF_MAC], discovery_info[CONF_HOST])
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()
