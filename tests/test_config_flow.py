@@ -192,6 +192,9 @@ async def test_dhcp_discovery_prefills_host(hass: HomeAssistant, mock_api: Magic
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "credentials"
     mock_scan.assert_not_awaited()
+    assert hass.config_entries.flow.async_get(result["flow_id"])["context"]["title_placeholders"] == {
+        "host": "192.168.1.60"
+    }
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**USER_INPUT, CONF_HOST: "192.168.1.60"}
