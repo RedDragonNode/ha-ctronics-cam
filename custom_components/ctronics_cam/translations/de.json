@@ -25,7 +25,7 @@
         },
         "data_description": {
           "name": "Wird in Home Assistant als Gerätename angezeigt.",
-          "prefix": "Pflichtfeld. Wird dem Namen vorangestellt: Aus \"Spielzimmer\" und \"Fuchsrevier\" wird \"Spielzimmer Fuchsrevier\", die Entity-IDs beginnen dann mit spielzimmer_fuchsrevier. Lässt sich später nicht mehr ändern.",
+          "prefix": "Pflichtfeld. Wird dem Namen vorangestellt: Aus \"Spielzimmer\" und \"Fuchsrevier\" wird \"Spielzimmer Fuchsrevier\", die Entity-IDs beginnen dann mit spielzimmer_fuchsrevier. Lässt sich später in den Optionen ändern, die Entity-IDs bleiben dabei, wie sie sind.",
           "host": "Feste IP-Adresse der Kamera, am besten im Router reserviert.",
           "port": "Port der Weboberfläche der Kamera, normalerweise 80."
         }
@@ -67,16 +67,19 @@
       "init": {
         "title": "Optionen der Ctronics 4K Cam",
         "data": {
+          "prefix": "Präfix",
           "ptz_step_ms": "Schrittdauer der Richtungstasten",
           "presets": "Preset-Positionen"
         },
         "data_description": {
+          "prefix": "Wird dem Namen der Kamera vorangestellt, zum Beispiel \"Spielzimmer\". Darf nicht leer sein. Ändert den Gerätenamen, solange du ihn in Home Assistant nicht von Hand umbenannt hast. Die Entity-IDs ändern sich nicht.",
           "ptz_step_ms": "Wie lange sich die Kamera bewegt, wenn eine Richtungstaste gedrückt wird.",
           "presets": "Eine Position pro Zeile als Nummer und Name, zum Beispiel \"1: Schaukel\". Nummern von 1 bis 64. Die Positionen selbst liegen in der Kamera. Sobald du welche einträgst, gibt es ein Auswahlfeld dafür."
         }
       }
     },
     "error": {
+      "prefix_required": "Der Präfix darf nicht leer sein.",
       "invalid_presets": "Pro Zeile eine Position im Format \"Nummer: Name\" mit einer Nummer von 1 bis 64."
     }
   },

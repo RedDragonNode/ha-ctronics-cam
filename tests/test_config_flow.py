@@ -347,53 +347,111 @@ async def test_reconfigure_changes_address(
     assert mock_config_entry.data[CONF_PORT] == 8000
 
 
+PRESETS = "1: Schaukel" + chr(10) + "10: Bett"
+
+
+async def _setup_with_prefix(
+    hass: HomeAssistant, entry: MockConfigEntry, prefix: str = "Spielzimmer"
+) -> MockConfigEntry:
+    hass.config.internal_url = "http://192.168.1.2:8123"
+    entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(entry, options={CONF_PREFIX: prefix})
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    return entry
+
+
 async def test_options_flow_rejects_bad_presets_then_saves(
-    hass: HomeAssistant, setup_integration: MockConfigEntry
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
 ) -> None:
-    result = await hass.config_entries.options.async_init(setup_integration.entry_id)
+    entry = await _setup_with_prefix(hass, mock_config_entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["step_id"] == "init"
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_PTZ_STEP_MS: 500, CONF_PRESETS: "kaputt"}
+        result["flow_id"], {CONF_PREFIX: "Spielzimmer", CONF_PTZ_STEP_MS: 500, CONF_PRESETS: "kaputt"}
     )
     assert result["errors"] == {CONF_PRESETS: "invalid_presets"}
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_PTZ_STEP_MS: 500, CONF_PRESETS: "1: Schaukel\n10: Bett"}
+        result["flow_id"], {CONF_PREFIX: "Spielzimmer", CONF_PTZ_STEP_MS: 500, CONF_PRESETS: PRESETS}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert setup_integration.options == {
+    assert entry.options == {
+        CONF_PREFIX: "Spielzimmer",
         CONF_PTZ_STEP_MS: 500,
-        CONF_PRESETS: "1: Schaukel\n10: Bett",
+        CONF_PRESETS: PRESETS,
     }
 
 
-async def test_options_flow_has_no_prefix_field_and_keeps_the_prefix(
+async def test_options_flow_shows_the_current_prefix_as_a_required_field(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
 ) -> None:
-    hass.config.internal_url = "http://192.168.1.2:8123"
-    mock_config_entry.add_to_hass(hass)
-    hass.config_entries.async_update_entry(mock_config_entry, options={CONF_PREFIX: "Spielzimmer"})
-    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done(wait_background_tasks=True)
+    entry = await _setup_with_prefix(hass, mock_config_entry)
 
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
-    assert set(result["data_schema"].schema) == {CONF_PTZ_STEP_MS, CONF_PRESETS}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
 
+    assert set(result["data_schema"].schema) == {CONF_PREFIX, CONF_PTZ_STEP_MS, CONF_PRESETS}
+    prefix_field = next(key for key in result["data_schema"].schema if key == CONF_PREFIX)
+    assert isinstance(prefix_field, vol.Required)
+    assert prefix_field.default() == "Spielzimmer"
+
+
+async def test_options_flow_changes_the_prefix_and_the_device_name_but_not_the_entity_ids(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
+) -> None:
+    entry = await _setup_with_prefix(hass, mock_config_entry, "PL")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_PTZ_STEP_MS: 400, CONF_PRESETS: "1: Schaukel"}
+        result["flow_id"], {CONF_PREFIX: " PI ", CONF_PTZ_STEP_MS: 400, CONF_PRESETS: ""}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done(wait_background_tasks=True)
 
-    assert mock_config_entry.options == {
-        CONF_PREFIX: "Spielzimmer",
-        CONF_PTZ_STEP_MS: 400,
-        CONF_PRESETS: "1: Schaukel",
-    }
-    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, MAC), mock_config_entry.entry_id)
+    assert entry.options[CONF_PREFIX] == "PI"
+    device = dr.async_get(hass).async_get_device_by_identifier((DOMAIN, MAC), entry.entry_id)
     assert device is not None
-    assert device.name == "Spielzimmer Flur"
+    assert device.name == "PI Flur"
+    assert hass.states.get("camera.pl_flur") is not None
+    assert hass.states.get("camera.pi_flur") is None
+
+
+async def test_options_flow_keeps_a_device_name_that_was_set_by_hand(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
+) -> None:
+    entry = await _setup_with_prefix(hass, mock_config_entry, "PL")
+    registry = dr.async_get(hass)
+    device = registry.async_get_device_by_identifier((DOMAIN, MAC), entry.entry_id)
+    assert device is not None
+    registry.async_update_device(device.id, name_by_user="#1 Flur")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_PREFIX: "PI", CONF_PTZ_STEP_MS: 400, CONF_PRESETS: ""}
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    device = registry.async_get(device.id)
+    assert device is not None
+    assert device.name_by_user == "#1 Flur"
+    assert device.name == "PI Flur"
+
+
+async def test_options_flow_requires_a_prefix(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, mock_api: MagicMock, mock_onvif: MagicMock
+) -> None:
+    entry = await _setup_with_prefix(hass, mock_config_entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    for empty in ("", "   "):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_PREFIX: empty, CONF_PTZ_STEP_MS: 500, CONF_PRESETS: "kaputt"}
+        )
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {CONF_PREFIX: "prefix_required", CONF_PRESETS: "invalid_presets"}
+
+    assert entry.options == {CONF_PREFIX: "Spielzimmer"}
 
 
 async def test_reconfigure_has_no_prefix_field(

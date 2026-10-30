@@ -230,22 +230,26 @@ class CtronicsConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class CtronicsOptionsFlow(OptionsFlowWithReload):
-    """Schrittdauer der PTZ-Tasten und Namen der Preset-Positionen.
+    """Präfix des Gerätenamens, Schrittdauer der PTZ-Tasten und Namen der Preset-Positionen.
 
-    Das Präfix wird nur beim Hinzufügen der Kamera vergeben und bleibt hier unberührt.
+    Ein geändertes Präfix wirkt auf den Gerätenamen, die Entity-IDs bleiben, wie sie sind.
     """
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            prefix = user_input[CONF_PREFIX].strip()
+            if not prefix:
+                errors[CONF_PREFIX] = "prefix_required"
             try:
                 parse_presets(user_input.get(CONF_PRESETS, ""))
             except ValueError:
                 errors[CONF_PRESETS] = "invalid_presets"
-            else:
+            if not errors:
                 return self.async_create_entry(
                     data={
                         **self.config_entry.options,
+                        CONF_PREFIX: prefix,
                         CONF_PTZ_STEP_MS: int(user_input[CONF_PTZ_STEP_MS]),
                         CONF_PRESETS: user_input.get(CONF_PRESETS, ""),
                     }
@@ -254,6 +258,7 @@ class CtronicsOptionsFlow(OptionsFlowWithReload):
         current = user_input or self.config_entry.options
         schema = vol.Schema(
             {
+                vol.Required(CONF_PREFIX, default=current.get(CONF_PREFIX, vol.UNDEFINED)): selector.TextSelector(),
                 vol.Required(
                     CONF_PTZ_STEP_MS, default=current.get(CONF_PTZ_STEP_MS, DEFAULT_PTZ_STEP_MS)
                 ): selector.NumberSelector(

@@ -45,7 +45,7 @@ Der Sensor `Bewegung` zeigt die **normale Bewegungserkennung** der Kamera. Die K
 
 Beim Hinzufügen einer Kamera ist das Feld **Präfix** ein Pflichtfeld. Es wird dem Namen der Kamera vorangestellt: Aus dem Präfix `Spielzimmer` und dem Namen `Fuchsrevier` wird das Gerät **Spielzimmer Fuchsrevier**, und die Entity-IDs beginnen mit `spielzimmer_fuchsrevier` (zum Beispiel `camera.spielzimmer_fuchsrevier`). So bleiben die IDs eindeutig, auch wenn gleiche Namen schon von einer anderen Integration belegt sind.
 
-Das Präfix wird nur beim Hinzufügen vergeben. Unter **Konfigurieren** und beim Ändern der Verbindung gibt es das Feld nicht mehr. Kameras, die vor dieser Pflicht ohne Präfix eingerichtet wurden, laufen unverändert weiter.
+Das Präfix lässt sich später unter **Konfigurieren** ändern, es bleibt dort ein Pflichtfeld und darf nicht leer sein. Das ändert den Gerätenamen, aber nicht die Entity-IDs: Die behalten das Präfix, mit dem sie angelegt wurden. Hast du das Gerät in Home Assistant von Hand umbenannt, zeigt Home Assistant weiter deinen Namen. Beim Speichern lädt Home Assistant die Kamera kurz neu. Kameras, die vor der Pflicht ohne Präfix eingerichtet wurden, brauchen beim nächsten Speichern der Optionen eins.
 
 ### Preset-Positionen
 
@@ -81,7 +81,7 @@ Local integration for **Ctronics 4K pan/tilt cameras** running Hipcam firmware (
 
 **Features:** RTSP live stream and snapshot, PTZ buttons, a selector for named presets, switches for AI detection and auto tracking, detection type and threshold, night vision LEDs, flip and mirror, a motion `binary_sensor` via ONVIF events (general motion, the camera does not report persons separately), SD card diagnostics, four PTZ services, a network scan that shows every camera on your home network under *Discovered* and in the add dialog, DHCP discovery, reauth, reconfigure and diagnostics.
 
-**Name prefix:** when adding a camera the *Prefix* field is required. It puts a word in front of the camera name, so "Playroom" and "Fox den" become the device "Playroom Fox den" with entity IDs starting with `playroom_fox_den`. It is set only when the camera is added and cannot be changed afterwards. Cameras set up without one keep working.
+**Name prefix:** when adding a camera the *Prefix* field is required. It puts a word in front of the camera name, so "Playroom" and "Fox den" become the device "Playroom Fox den" with entity IDs starting with `playroom_fox_den`. It can be changed later under *Configure* (still required); that renames the device but leaves the entity IDs alone. Cameras set up without one keep working until you save their options, which then asks for one.
 
 **Motion events** are pushed by the camera to a Home Assistant webhook, so Home Assistant needs an internal URL using plain HTTP that the camera can reach.
 
